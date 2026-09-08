@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  core:
+    name: DSP core and tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ninja
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then sudo apt-get update && sudo apt-get install -y ninja-build; else brew install ninja; fi
+      - name: Core must not include JUCE
+        run: |
+          if grep -rl "juce" dsp/; then echo "dsp/ must stay JUCE-free"; exit 1; fi
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Render kit
+        run: |
+          if [ -x build/tests/render_kit ]; then build/tests/render_kit build/render; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: renders-${{ matrix.os }}
+          path: build/render
+          if-no-files-found: ignore
+
+  plugin:
+    name: JUCE plugin (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libasound2-dev libjack-jackd2-dev libxrandr-dev \
+            libxinerama-dev libxcursor-dev libgl1-mesa-dev libfreetype-dev libx11-dev libfontconfig1-dev
+      - name: Dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DHIC_BUILD_PLUGIN=ON -DHIC_BUILD_TESTS=OFF
+      - name: Build
+        run: cmake --build build
+      - name: Locate artefacts
+        run: find build -name "*.vst3" -o -name "*.component" -o -name "Hic" -type f | head

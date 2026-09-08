@@ -36,13 +36,13 @@ HicEditor::HicEditor(HicProcessor& p)
                        { id::bedGateAtt, "Gate Att" }, { id::bedGateRel, "Gate Rel" }, { id::bedGateDuty, "Gate Open" } });
     duckPanel.setCellSize(66, 74);
     duckPanel.rebuild({ { id::duckDepth, "Depth" }, { id::duckHold, "Hold" }, { id::duckRel, "Release" } });
-    repeatPanel.setCellSize(66, 74);
+    repeatPanel.setCellSize(62, 74);
     repeatPanel.rebuild({ { id::repOn, "On" }, { id::repGrid, "Grid" }, { id::repProb, "Chance" }, { id::repLen, "Length" },
                           { id::repMinBars, "Bars" }, { id::repMix, "Mix" } });
-    freezePanel.setCellSize(66, 74);
+    freezePanel.setCellSize(62, 74);
     freezePanel.rebuild({ { id::frzHold, "Hold" }, { id::frzGrain, "Grain" }, { id::frzDensity, "Density" }, { id::frzSpray, "Spray" },
                           { id::frzJitter, "Jitter" }, { id::frzMix, "Mix" } });
-    reverbPanel.setCellSize(66, 74);
+    reverbPanel.setCellSize(62, 74);
     reverbPanel.rebuild({ { id::revType, "Type" }, { id::revDecay, "Decay" }, { id::revDamp, "Damp" }, { id::revPre, "Predelay" }, { id::revMix, "Return" } });
     addAndMakeVisible(bedPanel); addAndMakeVisible(duckPanel); addAndMakeVisible(repeatPanel);
     addAndMakeVisible(freezePanel); addAndMakeVisible(reverbPanel);
@@ -155,8 +155,8 @@ void HicEditor::resized() {
     r.removeFromTop(6);
 
     auto fxRow2 = r.removeFromBottom(100);
-    repeatPanel.setBounds(fxRow2.removeFromLeft(6 * 66 + 12)); fxRow2.removeFromLeft(6);
-    freezePanel.setBounds(fxRow2.removeFromLeft(6 * 66 + 12)); fxRow2.removeFromLeft(6);
+    repeatPanel.setBounds(fxRow2.removeFromLeft(6 * 62 + 12)); fxRow2.removeFromLeft(6);
+    freezePanel.setBounds(fxRow2.removeFromLeft(6 * 62 + 12)); fxRow2.removeFromLeft(6);
     reverbPanel.setBounds(fxRow2);
     r.removeFromBottom(6);
     auto fxRow = r.removeFromBottom(100);

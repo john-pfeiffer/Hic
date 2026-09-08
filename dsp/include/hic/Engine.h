@@ -41,6 +41,7 @@ public:
     RepeatParams  repeat;
     FreezeParams  freeze;
     Pattern       patterns[kNumPatterns];
+    int           patternVersion = -1;   // host bookkeeping: which published pattern set is loaded
 
     void prepare(float sampleRate);
 

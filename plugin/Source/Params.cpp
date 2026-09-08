@@ -26,14 +26,17 @@ StringArray presetNames(hic::PadType type) {
     return out;
 }
 
+static AudioParameterFloatAttributes attrs(const String& unit, float hi) {
+    const int decimals = hi > 500.0f ? 0 : (hi > 30.0f ? 1 : 2);
+    return AudioParameterFloatAttributes().withLabel(unit)
+        .withStringFromValueFunction([decimals](float v, int) { return String(v, decimals); });
+}
 static std::unique_ptr<AudioParameterFloat> lin(const String& idStr, const String& name, float lo, float hi, float def, const String& unit = {}) {
-    return std::make_unique<AudioParameterFloat>(ParameterID{ idStr, 1 }, name, NormalisableRange<float>(lo, hi), def,
-        AudioParameterFloatAttributes().withLabel(unit));
+    return std::make_unique<AudioParameterFloat>(ParameterID{ idStr, 1 }, name, NormalisableRange<float>(lo, hi), def, attrs(unit, hi));
 }
 static std::unique_ptr<AudioParameterFloat> log(const String& idStr, const String& name, float lo, float hi, float def, const String& unit = {}) {
     NormalisableRange<float> range(lo, hi, 0.0f, 0.3f);
-    return std::make_unique<AudioParameterFloat>(ParameterID{ idStr, 1 }, name, range, def,
-        AudioParameterFloatAttributes().withLabel(unit));
+    return std::make_unique<AudioParameterFloat>(ParameterID{ idStr, 1 }, name, range, def, attrs(unit, hi));
 }
 
 AudioProcessorValueTreeState::ParameterLayout createLayout() {

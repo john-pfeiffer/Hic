@@ -138,13 +138,12 @@ public:
 
         // Patterns: copy when a new version was published; retry if it changed mid-copy.
         // The exporter uses its own Engine, so the applied version is tracked per engine.
-        if (&e != appliedEngine) { appliedEngine = &e; appliedVersion = -1; }
         for (int attempt = 0; attempt < 4; ++attempt) {
             const int v = version.load();
-            if (v == appliedVersion) break;
+            if (v == e.patternVersion) break;
             const int slot = activeSlot.load();
             std::memcpy(e.patterns, shared[slot], sizeof(e.patterns));
-            if (version.load() == v) { appliedVersion = v; break; }
+            if (version.load() == v) { e.patternVersion = v; break; }
         }
         for (auto& p : e.patterns) p.swingPct = static_cast<uint8_t>(*swing + 0.5f);
     }
@@ -166,8 +165,6 @@ private:
     hic::Pattern shared[2][hic::kNumPatterns];
     std::atomic<int> activeSlot { 0 };
     std::atomic<int> version { 0 };
-    int appliedVersion = -1;
-    const hic::Engine* appliedEngine = nullptr;
 };
 
 } // namespace hicplug

@@ -10,7 +10,7 @@ public:
     void setDecayMs(float ms, float sr) { k_ = decayCoef(ms, sr); }
     void trigger(float level = 1.0f) { y_ = level; }
     void kill() { y_ = 0.0f; }
-    float tick() { const float o = y_; y_ *= k_; return o; }
+    float tick() { const float o = y_; y_ *= k_; if (y_ < 1e-9f) y_ = 0.0f; return o; }
     float value() const { return y_; }
     bool active() const { return y_ > 1e-5f; }
 private:
@@ -20,8 +20,10 @@ private:
 /// Attack / release envelope driven by a gate. One-pole toward 1 or 0.
 class ArEnv {
 public:
-    void setAttackMs(float ms, float sr)  { ca_ = smoothCoef(ms < 0.1f ? 0.1f : ms, sr); }
-    void setReleaseMs(float ms, float sr) { cr_ = smoothCoef(ms < 0.1f ? 0.1f : ms, sr); }
+    /// Attack reaches ~95 % of full scale after `ms`.
+    void setAttackMs(float ms, float sr)  { ca_ = smoothCoef((ms < 0.1f ? 0.1f : ms) / 3.0f, sr); }
+    /// Release reaches -60 dB after `ms` (same convention as ExpDecay).
+    void setReleaseMs(float ms, float sr) { cr_ = decayCoef(ms < 0.1f ? 0.1f : ms, sr); }
     void gate(bool on) { gate_ = on; }
     bool gated() const { return gate_; }
     void reset(float v = 0.0f) { y_ = v; }

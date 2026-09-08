@@ -3,6 +3,9 @@
 # hardware build) needs lives here.
 add_library(hic_dsp STATIC
   src/Hic.cpp
+  src/ModalPresets.cpp
+  src/Kit.cpp
+  src/Engine.cpp
 )
 target_include_directories(hic_dsp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_definitions(hic_dsp PUBLIC HIC_MAX_SAMPLE_RATE=${HIC_MAX_SAMPLE_RATE})

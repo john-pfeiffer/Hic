@@ -30,6 +30,15 @@ inline float fastExp(float x) {
     return x;
 }
 
+/// sin(2*pi*p) for a phase p in [0, 1). Parabolic approximation with one
+/// refinement pass; max error about 0.1 %, no transcendental call.
+inline float fastSin01(float p) {
+    const float t = 2.0f * p - 1.0f;                 // [-1, 1)
+    float y = 4.0f * t * (1.0f - std::fabs(t));      // ~sin(pi t)
+    y = 0.225f * (y * std::fabs(y) - y) + y;
+    return -y;
+}
+
 inline float midiToHz(float note) { return 440.0f * std::exp2((note - 69.0f) * (1.0f / 12.0f)); }
 inline float dbToGain(float db)   { return std::exp2(db * 0.16609640474f); }   // 10^(db/20)
 inline float gainToDb(float g)    { return g > 1e-9f ? 20.0f * std::log10(g) : -180.0f; }
@@ -44,6 +53,13 @@ inline float decayCoef(float ms, float sr) {
 inline float smoothCoef(float ms, float sr) {
     const float n = ms * 0.001f * sr;
     return n < 1.0f ? 0.0f : std::exp(-1.0f / n);
+}
+
+/// Transparent below 0.75, soft knee above, never exceeds 1.0.
+inline float softClip(float x) {
+    const float a = std::fabs(x);
+    if (a <= 0.75f) return x;
+    return sign(x) * (0.75f + 0.25f * fastTanh((a - 0.75f) * 4.0f));
 }
 
 /// Zero out subnormals so long tails never slow the CPU down.

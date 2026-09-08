@@ -186,14 +186,15 @@ TEST(internal_clock_runs_the_pattern_without_a_host) {
     CHECK(e->currentStep(PadClosedHat) == -1);
 }
 
-TEST(bed_gate_follows_step_flags) {
+TEST(static_follows_step_flags) {
     auto e = makeFullEngine(kSr);
     clearPattern(e->patterns[0]);
     Track& t = e->patterns[0].tracks[PadClosedHat];
     for (int i = 0; i < 16; ++i) { t.steps[i].on = 1; t.steps[i].vel = 1; t.steps[i].flags = (i < 8) ? StepBedGate : 0; }
     e->kit.pads[PadClosedHat].level = 0.0f;
-    e->bed.type = BedType::Hiss; e->bed.level = 1.0f; e->bed.gate = BedGate::Steps; e->bed.gateAttackMs = 1.0f; e->bed.gateReleaseMs = 5.0f;
-    e->reverb.mix = 0.0f; e->repeat.enabled = false;
+    e->bus = BusParams{ 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f };
+    e->statik.levelDetail = 1.0f; e->statik.colour = 1.0f; e->statik.clock = StaticClock::Steps; e->statik.attackMs = 1.0f; e->statik.releaseMs = 5.0f;
+    e->repeat.enabled = false;
     const int frames = int(kSr * 2.0f);
     auto s = mono(renderEvents(*e, {}, frames, 64, 120.0));
     const int bar = int(2.0 * double(kSr));

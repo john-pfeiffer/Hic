@@ -10,33 +10,43 @@ Múm (*Finally We Are No One*), Arovane, Isan, Dntel, early Four Tet.
 
 ## What it does
 
-- **Twelve pads, five synthesis engines.** Kick (filtered sine with a snap
-  or blanket attack), Click (impulses, dipoles, reduced-bit bursts,
-  CD-skip trains), Modal (a struck-object model with cross-stick, rimshot,
-  woodblock, pencil tap, muted guitar, glockenspiel, toy piano, bell and
-  bowl presets), Noise (hats, brushes, shakers, paper) and Ping (FM,
-  ring-modulated and pitch-bent synthetic micro-percussion).
-- **Two factory kits on the General MIDI map**, so any existing drum
-  pattern plays: *Neon* (the Notwist / Lali Puna palette) and *Micro*
-  (morphing synthetic micro-percussion in the spirit of modular and FM
-  percussion sample packs).
-- **Feel.** Every hit can be nudged a few milliseconds and scattered in
-  time and velocity, deterministically from a seed, so a loop sounds the
-  same each time until you change the seed. A per-pad *morph* control
-  drifts the macros a little on every hit.
-- **A bed** of vinyl crackle and tape hiss that can run free, gate to the
-  clock or to step flags, and duck under the kick.
+- **One voice on every pad: exciter, resonator, shaper.** Six macros with
+  the same meaning everywhere. *Tune* (30 Hz to 3 kHz), *Decay* (5 ms to
+  2 s), *Exciter* (a single click, a soft mallet, or a noise burst),
+  *Body* (a tuned membrane with a pitch drop, through woody harmonic modes,
+  to inharmonic metal and hat territory), *Break* (a wavefolder and
+  saturation after the resonator, and above half way a feedback path that
+  keeps tails alive: boings, lasers, bending decays), and *Drift* (every
+  hit re-rolls the other five a little, deterministically from its seed).
+- **Six bus knobs that glue the kit** the way a small modular rack would:
+  *Drive* (a gentle fold and saturation), *Damp* (the blanket lowpass and
+  tilt), *Texture* (grit inside every hit plus a clocked static voice),
+  *Space* (a short spring or room), *Drift* (a multiplier on every pad's
+  drift) and *Feel* (timing and velocity scatter). The detailed controls
+  behind them sit under a Detail button.
+- **A global Key.** Root and scale; pads that follow the key snap their
+  Tune to the nearest scale degree at trigger time, so kick, snare and
+  tuned percussion sit in the song. Drift on a keyed pad only moves it to
+  a neighbouring degree.
+- **Everything rhythmic.** There is no free-running noise bed. Grit lives
+  inside each hit, and the static voice only exists in pulses on a clock
+  division or on flagged steps, reseeded per bar so a bar of static is the
+  same bar every time.
+- **Three factory kits on the General MIDI map**, so any existing drum
+  pattern plays: *Neon* (damped, woody, clicks), *Micro* (metal, folded,
+  drifting) and *Modular* (laser and boing tails, everything keyed).
 - **Restrained glitch.** A beat repeat that fires at a low, seeded
-  probability with a minimum number of bars between stutters; a granular
-  freeze that grabs the last click and turns it into ticking insects
-  (MIDI note 90 holds it, 91 forces a stutter); a short spring or room
-  reverb with no hall setting.
+  probability with a minimum number of bars between stutters, and a
+  granular freeze that grabs the last click and turns it into ticking
+  insects (MIDI note 90 holds it, 91 forces a stutter).
 - **A step sequencer** with polymetric track lengths, per-step velocity,
   nudge, probability, ratchet, accent, reverse (the hit swells into its
-  step) and bed-gate flags, synced to the host or an internal clock.
-- **Sample export.** *Export kit* bounces every pad as a set of one-shots
-  at several seeds and velocities; *Bounce loop* renders the active
-  pattern. Build your own packs from the instrument.
+  step) and static-pulse flags, synced to the host or an internal clock.
+- **Sample export.** *Export kit* bounces every pad as one-shots at several
+  seeds and velocities; *Bounce loop* renders the active pattern.
+
+Plugin state saved by the 0.1 version is not loaded by 0.2 (the pad model
+changed); patterns are stored separately and still load.
 
 ## Shape of the project
 

@@ -5,7 +5,7 @@
 #include "hic/fx/SpringReverb.h"
 #include "hic/fx/BeatRepeat.h"
 #include "hic/fx/GranularFreeze.h"
-#include "hic/Bed.h"
+#include "hic/StaticTexture.h"
 
 using namespace hic;
 using namespace hictest;
@@ -15,7 +15,7 @@ static constexpr float kSr = 48000.0f;
 TEST(feel_is_deterministic_per_seed) {
     auto make = [](uint32_t seed) {
         auto e = makeEngine(kSr);
-        e->feel.scatterMs = 6.0f; e->feel.velScatter = 0.3f; e->feel.lookaheadMs = 20.0f; e->feel.seed = seed;
+        e->bus.feel = 1.0f; e->feel.scatterMs = 6.0f; e->feel.velScatter = 0.3f; e->feel.lookaheadMs = 20.0f; e->feel.seed = seed;
         e->prepare(kSr);
         return e;
     };
@@ -32,7 +32,7 @@ TEST(feel_is_deterministic_per_seed) {
 
 TEST(scatter_moves_hits_within_lookahead) {
     auto e = makeEngine(kSr);
-    e->feel.scatterMs = 8.0f; e->feel.lookaheadMs = 20.0f; e->prepare(kSr);
+    e->bus.feel = 1.0f; e->feel.scatterMs = 8.0f; e->feel.lookaheadMs = 20.0f; e->prepare(kSr);
     e->kit.pads[PadClosedHat].scatterMul = 1.0f;
     int minFirst = 1 << 30, maxFirst = -1;
     for (int i = 0; i < 12; ++i) {
@@ -170,55 +170,43 @@ TEST(freeze_is_silent_when_off_and_sustains_when_held) {
     CHECK(peak(l.data(), n) == 0.0f);
 }
 
-TEST(crackle_density_and_hiss_are_sane) {
-    Bed bed; bed.prepare(kSr);
-    BedParams p; p.type = BedType::Crackle; p.level = 1.0f; p.density = 40.0f; p.popRatio = 0.0f;
-    const int n = int(kSr * 5.0f);
-    std::vector<float> l((size_t)n, 0.0f), r((size_t)n, 0.0f);
-    bed.render(l.data(), r.data(), nullptr, n, p);
-    CHECK(!hasNaN(l.data(), n));
-    // Count onsets: a sample above threshold preceded by 20 quiet ms.
-    int onsets = 0; int quiet = 1 << 20;
-    for (int i = 0; i < n; ++i) {
-        if (std::fabs(l[size_t(i)]) > 0.02f) { if (quiet > int(0.005f * kSr)) ++onsets; quiet = 0; }
-        else ++quiet;
+TEST(static_pulses_land_on_the_clock) {
+    auto e = makeFullEngine(kSr);
+    e->bus = BusParams{ 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f };
+    e->statik.levelDetail = 1.0f; e->statik.clock = StaticClock::Sixteenths; e->statik.pulseMs = 20.0f;
+    e->statik.attackMs = 1.0f; e->statik.releaseMs = 5.0f; e->statik.colour = 0.5f;
+    e->repeat.enabled = false;
+    const int frames = int(kSr * 4.0f);
+    Stereo st = renderEvents(*e, {}, frames, 64, 120.0);
+    auto s = mono(st);
+    const int step = int(0.125 * double(kSr));   // a sixteenth at 120 BPM
+    for (int k = 1; k < 15; ++k) {
+        const int onset = firstIndexAbove(s.data() + k * step - 200, 400, 2e-3f) + k * step - 200;
+        CHECK_MSG(std::abs(onset - k * step) <= int(0.001f * kSr), "pulse %d onset %d vs %d", k, onset, k * step);
+        const float on = rms(s.data() + k * step + 100, int(0.015f * kSr));
+        const float off = rms(s.data() + k * step + int(0.06f * kSr), int(0.05f * kSr));
+        CHECK_MSG(on > off * 10.0f, "pulse %d on %.4f off %.4f", k, double(on), double(off));
     }
-    CHECK_MSG(onsets > 100 && onsets < 300, "crackle onsets %d in 5 s at density 40", onsets);
     bool stereoDiffers = false;
-    for (int i = 0; i < n; ++i) if (l[size_t(i)] != r[size_t(i)]) { stereoDiffers = true; break; }
+    for (int i = 0; i < frames; ++i) if (st.l[size_t(i)] != st.r[size_t(i)]) { stereoDiffers = true; break; }
     CHECK(stereoDiffers);
-
-    Bed h; h.prepare(kSr);
-    BedParams hp; hp.type = BedType::Hiss; hp.level = 1.0f;
-    std::fill(l.begin(), l.end(), 0.0f);
-    h.render(l.data(), r.data(), nullptr, n, hp);
-    CHECK(!hasNaN(l.data(), n));
-    CHECK(rms(l.data(), n) > 0.001f && peak(l.data(), n) < 1.0f);
-    CHECK(bandRatioDb(l.data(), n, kSr, 4000.0f) < 0.0f);   // pink-ish, not white
+    // Bar 2 equals bar 1: pulses are seeded from their position in the bar.
+    const int bar = 16 * step;
+    float maxDiff = 0.0f;
+    for (int i = 0; i < bar; ++i) maxDiff = std::max(maxDiff, std::fabs(s[size_t(i)] - s[size_t(i + bar)]));
+    CHECK_MSG(maxDiff < 1e-5f, "bars differ by %g", double(maxDiff));
+    CHECK(!hasNaN(s.data(), frames));
 }
 
-TEST(bed_gates_to_the_clock_and_ducks_to_the_kick) {
-    auto e = makeFullEngine(kSr);
-    e->bed.type = BedType::Hiss; e->bed.level = 1.0f; e->bed.gate = BedGate::Eighths; e->bed.gateDuty = 0.5f;
-    e->bed.gateAttackMs = 1.0f; e->bed.gateReleaseMs = 5.0f;
-    e->reverb.mix = 0.0f; e->repeat.enabled = false;
-    const int frames = int(kSr * 2.0f);
-    auto s = mono(renderEvents(*e, {}, frames, 64, 120.0));
-    // At 120 BPM an eighth is 250 ms: open for the first 125 ms of each.
-    const int eighth = int(0.25f * kSr);
-    float onRms = 0.0f, offRms = 0.0f;
-    for (int k = 2; k < 7; ++k) {
-        onRms += rms(s.data() + k * eighth + 200, eighth / 2 - 400);
-        offRms += rms(s.data() + k * eighth + eighth / 2 + 400, eighth / 2 - 600);
-    }
-    CHECK_MSG(onRms > offRms * 3.0f, "gate on %.4f off %.4f", double(onRms), double(offRms));
-
+TEST(static_ducks_to_the_kick) {
     auto d = makeFullEngine(kSr);
-    d->bed.type = BedType::Hiss; d->bed.level = 1.0f; d->bed.gate = BedGate::Off;
+    d->bus = BusParams{ 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f };
+    d->statik.levelDetail = 1.0f; d->statik.clock = StaticClock::Quarters; d->statik.pulseMs = 2000.0f; d->statik.colour = 1.0f;
     d->duck.depthDb = -20.0f; d->duck.holdMs = 60.0f; d->duck.releaseMs = 200.0f;
-    d->reverb.mix = 0.0f; d->repeat.enabled = false;
+    d->repeat.enabled = false;
     d->kit.pads[PadKick].level = 0.0f;   // silent kick, only the duck remains
-    auto k = mono(renderEvents(*d, { hit(int(0.5f * kSr), PadKick, 1.0f) }, frames, 64));
+    const int frames = int(kSr * 2.0f);
+    auto k = mono(renderEvents(*d, { hit(int(0.5f * kSr), PadKick, 1.0f) }, frames, 64, 120.0));
     const float before = rms(k.data() + int(0.3f * kSr), int(0.1f * kSr));
     const float during = rms(k.data() + int(0.505f * kSr), int(0.05f * kSr));
     const float after = rms(k.data() + int(1.5f * kSr), int(0.1f * kSr));
@@ -228,7 +216,7 @@ TEST(bed_gates_to_the_clock_and_ducks_to_the_kick) {
 
 TEST(control_notes_hold_freeze_and_force_repeat) {
     auto e = makeFullEngine(kSr);
-    e->bed.type = BedType::Off; e->reverb.mix = 0.0f;
+    e->bus.texture = 0.0f; e->bus.space = 0.0f;
     e->repeat.probability = 0.0f; e->repeat.lengthBeats = 0.5f;
     e->freeze.mix = 1.0f;
     NoteEvent holdOn = midiHit(int(0.3f * kSr), kNoteFreezeHold, 1.0f);

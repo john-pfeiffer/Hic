@@ -14,7 +14,8 @@ public:
     }
 
     /// Starts a hit on `pad`. Returns the voice index used.
-    int noteOn(const KitParams& kit, int pad, int note, float vel, uint32_t seed, bool reverse = false) {
+    int noteOn(const KitParams& kit, int pad, int note, float vel, uint32_t seed, bool reverse,
+               const KeyParams& key, float driftMul, float texture) {
         if (pad < 0 || pad >= kNumPads) return -1;
         const PadParams& p = kit.pads[pad];
 
@@ -46,7 +47,7 @@ public:
                 if (voices_[i].age() < oldestAge) { oldestAge = voices_[i].age(); slot = i; }
         }
         voices_[slot].setAge(++counter_);
-        voices_[slot].trigger(p, pad, vel, note, seed, reverse);
+        voices_[slot].trigger(p, pad, vel, note, seed, reverse, key, driftMul, texture);
         return slot;
     }
 

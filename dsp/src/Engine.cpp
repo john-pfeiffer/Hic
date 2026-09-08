@@ -1,4 +1,6 @@
 #include "hic/Engine.h"
+#include <cstdint>
+#include <cmath>
 
 namespace hic {
 
@@ -7,16 +9,25 @@ void Engine::prepare(float sampleRate) {
     voices_.prepare(sr_);
     clock_.prepare(sr_);
     seq_.prepare(sr_);
-    bed_.prepare(sr_);
+    static_.prepare(sr_, hashSeed(feel.seed, 0x5741u));
     ducker_.prepare(sr_);
     reverb_.prepare(sr_);
     repeat_.prepare(sr_);
     freeze_.prepare(sr_);
+    damp_.prepare(sr_);
     queue_.clear();
     blockStart_ = 0;
     nPending_ = 0;
     hitCounter_ = 0;
     lookahead_ = static_cast<int>(feel.lookaheadMs * 0.001f * sr_);
+}
+
+FeelParams Engine::effectiveFeel() const {
+    FeelParams f = feel;
+    const float amount = clamp(bus.feel, 0.0f, 1.0f);
+    f.scatterMs = feel.scatterMs * amount;
+    f.velScatter = feel.velScatter * amount;
+    return f;
 }
 
 bool Engine::queueHit(int pad, float vel, int note, int offset) {
@@ -59,26 +70,44 @@ void Engine::enqueue(NoteEvent e, int n) {
             e.seed = (e.source == static_cast<uint8_t>(EventSource::Seq))
                        ? hashSeed(feel.seed, e.bar, static_cast<uint32_t>(e.step) | (static_cast<uint32_t>(e.pad) << 16))
                        : hashSeed(feel.seed, e.note, ++hitCounter_);
-        Humanizer::apply(e, feel, kit.pads[e.pad < kNumPads ? e.pad : 0], sr_);
+        Humanizer::apply(e, effectiveFeel(), kit.pads[e.pad < kNumPads ? e.pad : 0], sr_);
     }
     queue_.push(e);
 }
 
-void Engine::updateBedGate(int n) {
-    // Rhythmic gate from the clock; the sequencer may override via setBedGate.
-    bool open = bedGateExternal_;
-    if (bed.gate == BedGate::Steps) {
-        open = clock_.playing() && global.seqEnabled ? Sequencer::bedGateAt(activePattern(), clock_.ppqAt(n / 2)) : true;
-    } else if (bed.gate != BedGate::Off) {
-        if (!clock_.playing()) open = true;
-        else {
-            const double period = bed.gate == BedGate::Sixteenths ? 0.25 : (bed.gate == BedGate::Eighths ? 0.5 : 1.0);
-            const double ppq = clock_.ppqAt(n / 2);
-            const double phase = ppq / period - std::floor(ppq / period);
-            open = phase < static_cast<double>(clamp(bed.gateDuty, 0.05f, 0.95f));
+void Engine::updateStaticPulse(int n) {
+    // The static only exists inside pulses: on a clock division, or on flagged
+    // steps. Gating is per sample so a bar replays exactly.
+    if (statik.clock == StaticClock::Off || !clock_.playing()) { for (int i = 0; i < n; ++i) { pulse_[i] = -1; pulseSeed_[i] = 0u; } return; }
+    const double spb = static_cast<double>(activePattern().stepsPerBeat < 1 ? 1 : activePattern().stepsPerBeat);
+    const int64_t beatsPerBar = clock_.beatsPerBar() < 1 ? 1 : clock_.beatsPerBar();
+    // Pulses are seeded by their position in the bar, so every bar of static is the same bar.
+    if (statik.clock == StaticClock::Steps) {
+        const int64_t perBar = static_cast<int64_t>(spb) * beatsPerBar;
+        int64_t lastStep = INT64_MIN; bool open = false;
+        for (int i = 0; i < n; ++i) {
+            const double ppq = clock_.ppqAt(i);
+            const int64_t stepIdx = static_cast<int64_t>(std::floor(ppq * spb + 1e-9));
+            if (stepIdx != lastStep) { lastStep = stepIdx; open = global.seqEnabled && Sequencer::bedGateAt(activePattern(), ppq); }
+            pulse_[i] = open ? stepIdx : -1;
+            pulseSeed_[i] = static_cast<uint32_t>(((stepIdx % perBar) + perBar) % perBar);
         }
+        return;
     }
-    bed_.setGate(open);
+    const double period = statik.clock == StaticClock::Sixteenths ? 0.25 : (statik.clock == StaticClock::Eighths ? 0.5 : 1.0);
+    const int64_t perBar = static_cast<int64_t>(static_cast<double>(beatsPerBar) / period + 0.5);
+    // Integer sample positions, like the sequencer, so a pulse edge never wobbles by a sample.
+    const double samplesPerBeat = clock_.samplesPerBeat();
+    const int64_t blockStart = static_cast<int64_t>(std::llround(clock_.ppqStart() * samplesPerBeat));
+    const int64_t pulseSamples = static_cast<int64_t>(clamp(statik.pulseMs, 1.0f, 2000.0f) * 0.001f * sr_);
+    const double periodSamples = period * samplesPerBeat;
+    for (int i = 0; i < n; ++i) {
+        const int64_t s = blockStart + i;
+        const int64_t idx = static_cast<int64_t>(std::floor(static_cast<double>(s) / periodSamples + 1e-9));
+        const int64_t start = static_cast<int64_t>(std::llround(static_cast<double>(idx) * periodSamples));
+        pulse_[i] = (s - start) < pulseSamples ? idx : -1;
+        pulseSeed_[i] = static_cast<uint32_t>(((idx % perBar) + perBar) % perBar);
+    }
 }
 
 void Engine::processChunk(const TransportInfo& transport, float* outL, float* outR, int n) {
@@ -100,24 +129,34 @@ void Engine::processChunk(const TransportInfo& transport, float* outL, float* ou
     int cursor = 0;
     for (int i = 0; i < nDue; ++i) {
         int at = static_cast<int>(due_[i].sampleTime - blockStart_);
-        if (at < cursor) at = cursor;   // late events (moved early past the block start) fire now
+        if (at < cursor) at = cursor;
         if (at > cursor) { renderVoices(cursor, at); ducker_.render(duckGain_ + cursor, at - cursor); cursor = at; }
         fire(due_[i]);
     }
     if (cursor < n) { renderVoices(cursor, n); ducker_.render(duckGain_ + cursor, n - cursor); }
 
-    // Bed, ducked by the kick, gated by the clock.
-    updateBedGate(n);
+    // Clocked static, ducked by the kick.
+    updateStaticPulse(n);
     ducker_.set(duck);
-    bed_.render(dryL_, dryR_, duckGain_, n, bed);
+    static_.render(dryL_, dryR_, duckGain_, pulse_, pulseSeed_, n, statik, clamp(bus.texture, 0.0f, 1.0f) * statik.levelDetail);
 
-    // Short reverb from the per-pad sends.
-    reverb_.set(reverb);
-    reverb_.process(revSend_, dryL_, dryR_, n);
+    // Bus drive, then the short reverb from the per-pad sends.
+    shaper_.set(bus.drive);
+    shaper_.process(dryL_, dryR_, n);
+    {
+        ReverbParams r = reverb;
+        const float space = clamp(bus.space, 0.0f, 1.0f);
+        r.mix = space;
+        r.decaySec = reverb.decaySec * lerp(0.5f, 1.5f, space);
+        reverb_.set(r);
+        if (space > 0.0f || !reverb_.quiet()) reverb_.process(revSend_, dryL_, dryR_, n);
+    }
 
-    // Rare stutter, then the freeze texture on top.
+    // Rare stutter, the freeze texture, then the blanket.
     repeat_.process(dryL_, dryR_, n, repeat, clock_, feel.seed);
     freeze_.process(freezeTap_, dryL_, dryR_, n, freeze);
+    damp_.set(bus.damp);
+    damp_.process(dryL_, dryR_, n);
 
     const float out = dbToGain(clamp(global.outputDb, -60.0f, 12.0f));
     for (int i = 0; i < n; ++i) {
@@ -138,11 +177,10 @@ void Engine::fire(const NoteEvent& e) {
         return;
     }
     if (e.flags & EvNoteOff) return;
-    if (e.flags & EvBedGate) { bedGateExternal_ = true; }
     const float vel = static_cast<float>(e.vel) * (1.0f / 127.0f);
     const uint32_t seed = e.seed != 0 ? e.seed : hashSeed(feel.seed, e.note, ++hitCounter_);
     if (e.pad < kNumPads && (kit.pads[e.pad].flags & PadDuckSource)) ducker_.trigger();
-    voices_.noteOn(kit, e.pad, e.note, vel, seed, (e.flags & EvReverse) != 0);
+    voices_.noteOn(kit, e.pad, e.note, vel, seed, (e.flags & EvReverse) != 0, key, clamp(bus.drift, 0.0f, 2.0f), clamp(bus.texture, 0.0f, 1.0f));
 }
 
 } // namespace hic

@@ -5,9 +5,9 @@
 
 namespace hicplug {
 
-/// Parameter IDs. Pad parameters are "p<index>_<name>".
+/// Parameter IDs (v2: one voice, six macros per pad, six bus macros).
 namespace id {
-    inline const juce::String kit        = "kit";         // 0 Neon, 1 Micro
+    inline const juce::String kit        = "kit";         // 0 Neon, 1 Micro, 2 Modular
     inline const juce::String out        = "out";
     inline const juce::String seed       = "seed";
     inline const juce::String sync       = "sync";        // 0 host, 1 internal
@@ -17,21 +17,28 @@ namespace id {
     inline const juce::String pattern    = "pattern";
     inline const juce::String seqEnable  = "seq_enable";
     inline const juce::String swing      = "swing";
-    inline const juce::String nudge      = "feel_nudge";
-    inline const juce::String scatter    = "feel_scatter";
-    inline const juce::String velScatter = "feel_vel";
 
-    inline const juce::String bedType    = "bed_type";
-    inline const juce::String bedLevel   = "bed_level";
-    inline const juce::String bedDensity = "bed_density";
-    inline const juce::String bedWarmth  = "bed_warmth";
-    inline const juce::String bedPop     = "bed_pop";
-    inline const juce::String bedColor   = "bed_color";
-    inline const juce::String bedHiss    = "bed_hiss";
-    inline const juce::String bedGate    = "bed_gate";
-    inline const juce::String bedGateAtt = "bed_gate_att";
-    inline const juce::String bedGateRel = "bed_gate_rel";
-    inline const juce::String bedGateDuty= "bed_gate_duty";
+    inline const juce::String busDrive   = "bus_drive";
+    inline const juce::String busDamp    = "bus_damp";
+    inline const juce::String busTexture = "bus_texture";
+    inline const juce::String busSpace   = "bus_space";
+    inline const juce::String busDrift   = "bus_drift";
+    inline const juce::String busFeel    = "bus_feel";
+    inline const juce::String keyRoot    = "key_root";
+    inline const juce::String keyScale   = "key_scale";
+
+    inline const juce::String nudge      = "feel_nudge";
+    inline const juce::String scatter    = "feel_scatter";   // maximum, scaled by bus Feel
+    inline const juce::String velScatter = "feel_vel";       // maximum, scaled by bus Feel
+
+    inline const juce::String stLevel    = "st_level";
+    inline const juce::String stDensity  = "st_density";
+    inline const juce::String stColour   = "st_colour";
+    inline const juce::String stWarmth   = "st_warmth";
+    inline const juce::String stClock    = "st_clock";
+    inline const juce::String stPulse    = "st_pulse";
+    inline const juce::String stAtt      = "st_att";
+    inline const juce::String stRel      = "st_rel";
     inline const juce::String duckDepth  = "duck_depth";
     inline const juce::String duckHold   = "duck_hold";
     inline const juce::String duckRel    = "duck_release";
@@ -54,21 +61,19 @@ namespace id {
     inline const juce::String revDecay   = "rev_decay";
     inline const juce::String revDamp    = "rev_damp";
     inline const juce::String revPre     = "rev_predelay";
-    inline const juce::String revMix     = "rev_mix";
 
     /// Per-pad parameter names (suffixes).
-    enum PadParam { Type = 0, Preset, M0, M1, M2, M3, M4, M5, M6, M7, Level, Pan, Lowpass, Drive, Send, TailCut,
-                    Reverse, Choke, Poly, FreezeSrc, DuckSrc, ScatterMul, Morph, PadParamCount };
+    enum PadParam { Tune = 0, Decay, Exciter, Body, Break, Drift, Level, Pan, Send, Choke, Poly, Reverse,
+                    FreezeSrc, DuckSrc, ScatterMul, FollowKey, PadParamCount };
     const char* padSuffix(PadParam p);
     juce::String pad(int index, PadParam p);
 }
 
-/// Builds the full parameter layout with defaults taken from the default kit.
+/// Builds the full parameter layout with defaults taken from the Neon kit.
 juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
 
-/// Human-readable preset names for the pad type combo boxes.
-juce::StringArray presetNames(hic::PadType type);
-juce::StringArray padTypeNames();
 juce::StringArray kitNames();
+juce::StringArray keyRootNames();
+juce::StringArray keyScaleNames();
 
 } // namespace hicplug

@@ -25,13 +25,11 @@ public:
     static int exportKit(EngineBridge& bridge, const juce::File& dir, const Options& opt, juce::String& error) {
         auto engine = std::make_unique<hic::Engine>();
         bridge.apply(*engine);
-        engine->bed.type = hic::BedType::Off;
+        engine->statik.levelDetail = 0.0f;   // one-shots keep their grit but not the clocked static
         engine->repeat.enabled = false;
         engine->freeze.hold = false;
         engine->feel.lookaheadMs = 0.0f;
         if (!opt.oneShotsWithReverb) engine->reverb.mix = 0.0f;
-        const juce::String kit = engine->global.internalPlay ? "" : "";
-        (void)kit;
         dir.createDirectory();
         int written = 0;
         const float sr = static_cast<float>(opt.sampleRate);

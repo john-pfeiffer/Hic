@@ -55,6 +55,20 @@ inline float smoothCoef(float ms, float sr) {
     return n < 1.0f ? 0.0f : std::exp(-1.0f / n);
 }
 
+/// Hermite step: 0 below a, 1 above b, smooth in between.
+inline float smoothstep(float x, float a, float b) {
+    const float t = clamp((x - a) / (b - a), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+
+/// Triangle wavefolder: identity on [-1, 1], folds back with period 4 outside.
+/// No transcendentals; the modular "boing" comes from folding a decaying sine.
+inline float foldTri(float x) {
+    const float p = (x + 1.0f) * 0.25f;
+    const float f = p - std::floor(p);
+    return 1.0f - 4.0f * std::fabs(f - 0.5f);
+}
+
 /// Transparent below 0.75, soft knee above, never exceeds 1.0.
 inline float softClip(float x) {
     const float a = std::fabs(x);

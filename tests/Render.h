@@ -13,20 +13,19 @@ struct Stereo { std::vector<float> l, r; };
 inline std::unique_ptr<hic::Engine> makeEngine(float sr) {
     auto e = std::make_unique<hic::Engine>();
     hic::makeDefaultKit(e->kit);
-    // Tests look at voices in isolation: no feel randomness, no bed, no reverb, no stutter.
-    e->feel.scatterMs = 0.0f;
-    e->feel.velScatter = 0.0f;
-    e->bed.type = hic::BedType::Off;
-    e->reverb.mix = 0.0f;
+    // Tests look at voices in isolation: every bus macro at zero (no drive, damp,
+    // texture, space, drift or feel), no stutter.
+    e->bus = hic::BusParams{ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
     e->repeat.enabled = false;
     e->prepare(sr);
     return e;
 }
 
-/// The instrument as shipped: default feel, bed, reverb and stutter.
-inline std::unique_ptr<hic::Engine> makeFullEngine(float sr) {
+/// The instrument as shipped: the kit's own bus setting, static, reverb and stutter.
+inline std::unique_ptr<hic::Engine> makeFullEngine(float sr, hic::KitId kitId = hic::KitNeon) {
     auto e = std::make_unique<hic::Engine>();
-    hic::makeDefaultKit(e->kit);
+    hic::makeKit(kitId, e->kit);
+    e->bus = e->kit.bus;
     e->prepare(sr);
     return e;
 }
@@ -68,9 +67,9 @@ inline std::vector<float> mono(const Stereo& s) {
 }
 
 inline void printStats(const char* name, const float* x, int n, float sr) {
-    std::printf("  %-22s peak %6.1f dBFS  rms %6.1f dB  decay %7.1f ms  >4k/<4k %6.1f dB  NaN %s\n",
+    std::printf("  %-24s peak %6.1f dBFS  rms %6.1f dB  decay %7.1f ms  >4k/<4k %6.1f dB  f0 %6.0f Hz  NaN %s\n",
                 name, double(peakDb(x, n)), double(hic::gainToDb(rms(x, n))), double(decayMs(x, n, sr)),
-                double(bandRatioDb(x, n, sr, 4000.0f)), hasNaN(x, n) ? "YES" : "no");
+                double(bandRatioDb(x, n, sr, 4000.0f)), double(estimateF0(x, n, sr)), hasNaN(x, n) ? "YES" : "no");
 }
 
 } // namespace hictest

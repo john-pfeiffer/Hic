@@ -12,6 +12,7 @@ endfunction()
 
 hic_add_test(test_primitives)
 hic_add_test(test_voices)
+hic_add_test(test_unified)
 hic_add_test(test_engine)
 hic_add_test(test_fx)
 hic_add_test(test_sequencer)

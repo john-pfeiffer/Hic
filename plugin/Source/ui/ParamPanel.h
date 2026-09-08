@@ -37,7 +37,7 @@ public:
             } else {
                 c->slider = std::make_unique<juce::Slider>(it.rotary ? juce::Slider::RotaryHorizontalVerticalDrag : juce::Slider::LinearHorizontal,
                                                            juce::Slider::TextBoxBelow);
-                c->slider->setTextBoxStyle(juce::Slider::TextBoxBelow, false, 62, 16);
+                c->slider->setTextBoxStyle(juce::Slider::TextBoxBelow, false, juce::jmax(54, cellW - 14), 16);
                 c->slider->setNumDecimalPlacesToDisplay(2);
                 addAndMakeVisible(*c->slider);
                 c->sliderAtt = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(state, it.id, *c->slider);

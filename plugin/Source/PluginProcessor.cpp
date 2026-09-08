@@ -8,7 +8,7 @@ static const char kPatternMagic[8] = { 'H', 'I', 'C', 'P', 'A', 'T', '0', '1' };
 
 HicProcessor::HicProcessor()
     : AudioProcessor(BusesProperties().withOutput("Output", AudioChannelSet::stereo(), true)),
-      apvts(*this, nullptr, "HicState", hicplug::createLayout()) {
+      apvts(*this, nullptr, "HicState2", hicplug::createLayout()) {   // v2: v1 state is ignored, patterns still load
     hic::makeDefaultKit(defaultKit_);
     engine = std::make_unique<hic::Engine>();
     engine->kit = defaultKit_;

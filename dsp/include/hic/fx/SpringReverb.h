@@ -45,9 +45,14 @@ public:
         for (auto& d : damp_) d.setLp(clamp(p.dampHz, 500.0f, 12000.0f), sr_);
     }
 
+    /// True when the loops hold nothing audible (so processing can be skipped).
+    bool quiet() const { return quiet_; }
+
     /// Mono send in, stereo added to L/R.
     void process(const float* send, float* L, float* R, int n) {
+        float energy = 0.0f;
         for (int i = 0; i < n; ++i) {
+            energy += std::fabs(send[i]);
             pre_.write(send[i]);
             float x = pre_.read(preLen_);
             for (int k = 0; k < 3; ++k) x = allpass(ap_[k], apLen_[k], 0.5f, x);
@@ -68,7 +73,9 @@ public:
             }
             L[i] += outL * 0.5f * mix_;
             R[i] += outR * 0.5f * mix_;
+            energy += std::fabs(outL);
         }
+        quiet_ = energy < 1e-6f;
     }
 
 private:
@@ -84,6 +91,7 @@ private:
     }
 
     float sr_ = 48000.0f, mix_ = 1.0f;
+    bool quiet_ = true;
     ReverbType type_ = ReverbType::Spring;
     int preLen_ = 1, apLen_[3] = { 1, 1, 1 }, loopLen_[2] = { 1, 1 }, dispLen_[kDispStages] = {};
     float fb_[2] = { 0.5f, 0.5f };

@@ -1,5 +1,5 @@
 #include "hic/Config.h"
 
 namespace hic {
-const char* versionString() { return "0.1.0"; }
+const char* versionString() { return "0.2.0"; }
 }

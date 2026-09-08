@@ -8,8 +8,8 @@ namespace hic {
 
 struct FeelParams {
     float    nudgeMs     = 0.0f;   // constant offset for every hit, -20..20
-    float    scatterMs   = 3.0f;   // random per-hit timing scatter (max, ms)
-    float    velScatter  = 0.08f;  // random per-hit velocity scatter (0..1)
+    float    scatterMs   = 10.0f;  // timing scatter at bus.feel = 1 (ms)
+    float    velScatter  = 0.25f;  // velocity scatter at bus.feel = 1 (0..1)
     float    lookaheadMs = 0.0f;   // every event is delayed by this so hits can move early
     uint32_t seed        = 1;
 };

@@ -14,6 +14,7 @@ public:
     float lp(float x) { y_ += (1.0f - a_) * (x - y_); return y_; }
     float hp(float x) { return x - lp(x); }
     float state() const { return y_; }
+    void flush() { y_ = flushDenormal(y_); }
 private:
     float a_ = 0.0f, y_ = 0.0f;
 };
@@ -34,6 +35,7 @@ public:
         a3_ = g_ * a2_;
     }
     void reset() { ic1_ = ic2_ = 0.0f; }
+    void flush() { ic1_ = flushDenormal(ic1_); ic2_ = flushDenormal(ic2_); }
 
     Out tick(float x) {
         const float v3 = x - ic2_;
@@ -52,9 +54,10 @@ private:
     float ic1_ = 0.0f, ic2_ = 0.0f;
 };
 
-/// Two-pole resonator tuned by frequency and T60. A unit impulse yields a
-/// decaying sine of amplitude ~1. Partials above 0.45 sr are muted.
-/// This is the building block of the modal voices: three multiplies each.
+/// Two-pole bandpass resonator tuned by frequency and T60, with zeros at DC
+/// and Nyquist so a slow exciter bump does not thump through it. A unit
+/// impulse yields a decaying cosine of amplitude 1 at any frequency.
+/// Partials above 0.45 sr are muted. Four multiplies per sample.
 class Resonator {
 public:
     void set(float hz, float t60Sec, float sr) {
@@ -63,23 +66,25 @@ public:
         const float r = std::exp(-6.9077553f / (t60Sec * sr));
         a1_ = 2.0f * r * std::cos(w);
         a2_ = -r * r;
-        inGain_ = std::sin(w);
+        inGain_ = 0.5f;
     }
-    void reset() { y1_ = y2_ = 0.0f; }
+    void reset() { y1_ = y2_ = x1_ = x2_ = 0.0f; }
     bool muted() const { return inGain_ == 0.0f; }
 
     float tick(float x) {
-        const float y = x * inGain_ + a1_ * y1_ + a2_ * y2_;
-        y2_ = y1_;
-        y1_ = y;
+        const float y = (x - x2_) * inGain_ + a1_ * y1_ + a2_ * y2_;
+        x2_ = x1_; x1_ = x;
+        y2_ = y1_; y1_ = y;
         return y;
     }
     /// True once the ringing has died away.
     bool quiet() const { return std::fabs(y1_) < 1e-6f && std::fabs(y2_) < 1e-6f; }
+    /// Feedback guard: if the state has grown past `thr`, scale it down hard.
+    void limit(float thr) { if (std::fabs(y1_) > thr) { y1_ *= 0.25f; y2_ *= 0.25f; } }
 
 private:
     float a1_ = 0.0f, a2_ = 0.0f, inGain_ = 0.0f;
-    float y1_ = 0.0f, y2_ = 0.0f;
+    float y1_ = 0.0f, y2_ = 0.0f, x1_ = 0.0f, x2_ = 0.0f;
 };
 
 } // namespace hic

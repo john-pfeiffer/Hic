@@ -9,7 +9,7 @@ namespace hicplug {
 /// The pattern editor. One row per pad, one cell per step.
 ///  click        toggle a step
 ///  drag up/down velocity      alt-drag: nudge      shift-drag: probability
-///  right-click  ratchet, accent, reverse, bed gate, note offset, clear
+///  right-click  ratchet, accent, reverse, static pulse, note offset, clear
 ///  row name     right-click for track length and mute
 class StepGrid : public juce::Component {
 public:
@@ -118,7 +118,7 @@ private:
         juce::PopupMenu m, ratchet, note;
         m.addItem(1, "Accent", true, (s.flags & hic::StepAccent) != 0);
         m.addItem(2, "Reverse (swell into step)", true, (s.flags & hic::StepReverse) != 0);
-        m.addItem(3, "Bed gate open", true, (s.flags & hic::StepBedGate) != 0);
+        m.addItem(3, "Static pulse", true, (s.flags & hic::StepBedGate) != 0);
         for (int k = 1; k <= 4; ++k) ratchet.addItem(10 + k, k == 1 ? "Single" : juce::String(k) + " hits", true, (s.ratchet <= 1 ? 1 : s.ratchet) == k);
         m.addSubMenu("Ratchet", ratchet);
         for (int n = -12; n <= 12; ++n) note.addItem(100 + n + 12, (n > 0 ? "+" : "") + juce::String(n), true, s.noteOffset == n);

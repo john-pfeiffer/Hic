@@ -3,7 +3,6 @@
 # hardware build) needs lives here.
 add_library(hic_dsp STATIC
   src/Hic.cpp
-  src/ModalPresets.cpp
   src/Kit.cpp
   src/Engine.cpp
   src/Pattern.cpp

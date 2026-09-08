@@ -46,9 +46,13 @@ a proxy; measure on the target with `DWT->CYCCNT` once a board exists.
    block size of 32 or 48, own one `hic::Engine`, and call
    `engine.process(events, n, transport, outL, outR, block)` from the
    audio callback with `transport.valid = false` so the internal clock runs.
-3. Map the panel: eight encoders or pots write `PadParams::macro[]` of the
-   selected pad, buttons select pads and toggle steps, a MIDI input feeds
-   `NoteEvent`s exactly as the plugin does.
+3. Map the panel: six pots write `PadParams::macro[]` (Tune, Decay,
+   Exciter, Body, Break, Drift) of the selected pad and six more write
+   `Engine::bus` (Drive, Damp, Texture, Space, Drift, Feel); two encoders
+   set `Engine::key`; buttons select pads and toggle steps; a MIDI input
+   feeds `NoteEvent`s exactly as the plugin does. That is the whole
+   control surface: twelve pots, two encoders, twelve pad buttons and a
+   step row.
 4. Patterns and kits are plain structs; persist them to QSPI flash with a
    `memcpy` and the same `{magic, version, sizeof}` header the plugin uses.
 5. Leave the reverse buffers, beat repeat ring and freeze ring at their

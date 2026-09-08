@@ -4,6 +4,7 @@
 #include <algorithm>
 #include "hic/Filters.h"
 #include "hic/Math.h"
+#include <vector>
 
 namespace hictest {
 
@@ -37,6 +38,42 @@ inline float bandRatioDb(const float* x, int n, float sr, float fc) {
     if (lo <= 1e-20) return 200.0f;
     if (hi <= 1e-20) return -200.0f;
     return float(10.0 * std::log10(hi / lo));
+}
+
+/// Fundamental estimate by normalised autocorrelation over the first 60 ms after
+/// the onset (searching 25 Hz .. 4 kHz). Returns 0 when nothing periodic is found.
+inline float estimateF0(const float* x, int n, float sr, float fromMs = 3.0f, float windowMs = 60.0f) {
+    const int onset = firstIndexAbove(x, n, peak(x, n) * 0.05f);
+    if (onset < 0) return 0.0f;
+    const int from = onset + int(fromMs * 0.001f * sr);
+    const int len = int(windowMs * 0.001f * sr);
+    if (from + 2 * len >= n) return 0.0f;
+    const int minLag = int(sr / 4000.0f), maxLag = int(sr / 25.0f);
+    double e0 = 0.0;
+    for (int i = 0; i < len; ++i) e0 += double(x[from + i]) * double(x[from + i]);
+    if (e0 < 1e-12) return 0.0f;
+    std::vector<float> corr(size_t(maxLag + 1), -1.0f);
+    for (int lag = minLag; lag <= maxLag && from + len + lag < n; ++lag) {
+        double c = 0.0, e1 = 0.0;
+        for (int i = 0; i < len; ++i) { c += double(x[from + i]) * double(x[from + i + lag]); e1 += double(x[from + i + lag]) * double(x[from + i + lag]); }
+        corr[size_t(lag)] = e1 > 1e-12 ? float(c / std::sqrt(e0 * e1)) : 0.0f;
+    }
+    // Smooth signals correlate at tiny lags: only look past the first dip below zero.
+    int start = minLag;
+    while (start <= maxLag && corr[size_t(start)] > 0.0f) ++start;
+    float best = 0.0f; int bestLag = 0;
+    for (int lag = start; lag <= maxLag; ++lag) if (corr[size_t(lag)] > best) { best = corr[size_t(lag)]; bestLag = lag; }
+    // Prefer the shortest lag past the dip whose correlation is close to the best (avoids octave-down errors).
+    for (int lag = start; lag < bestLag; ++lag) if (corr[size_t(lag)] > best * 0.9f && corr[size_t(lag)] > 0.5f) { bestLag = lag; break; }
+    if (best <= 0.3f || bestLag <= 0) return 0.0f;
+    // Parabolic interpolation around the peak.
+    float lagF = float(bestLag);
+    if (bestLag > start && bestLag < maxLag) {
+        const float a = corr[size_t(bestLag - 1)], b = corr[size_t(bestLag)], c = corr[size_t(bestLag + 1)];
+        const float den = a - 2.0f * b + c;
+        if (std::fabs(den) > 1e-9f) lagF += 0.5f * (a - c) / den;
+    }
+    return sr / lagF;
 }
 
 /// Count distinct sample values (used to verify bit reduction).

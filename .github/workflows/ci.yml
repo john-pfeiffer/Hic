@@ -63,6 +63,20 @@ jobs:
           cp -R build/plugin/Hic_artefacts/Release/AU dist/ 2>/dev/null || true
           cp -R build/plugin/Hic_artefacts/Release/Standalone dist/ 2>/dev/null || true
           ls -R dist | head -40
+      - name: Ad-hoc sign and pack (macOS)
+        if: runner.os == 'macOS'
+        # Ad-hoc signing keeps Apple Silicon happy; the tarball keeps executable bits,
+        # which GitHub's artifact zip would drop. After download run:
+        #   tar xzf Hic-macos.tar.gz && xattr -cr VST3 AU Standalone
+        run: |
+          find dist -name "*.vst3" -o -name "*.component" -o -name "*.app" | while read b; do codesign --force --deep -s - "$b"; done
+          tar czf Hic-macos.tar.gz -C dist .
+          rm -rf dist && mkdir dist && mv Hic-macos.tar.gz dist/
+      - name: Pack (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          tar czf Hic-linux.tar.gz -C dist .
+          rm -rf dist && mkdir dist && mv Hic-linux.tar.gz dist/
       - uses: actions/upload-artifact@v5
         with:
           name: Hic-plugin-${{ matrix.os }}

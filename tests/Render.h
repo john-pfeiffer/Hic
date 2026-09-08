@@ -13,20 +13,34 @@ struct Stereo { std::vector<float> l, r; };
 inline std::unique_ptr<hic::Engine> makeEngine(float sr) {
     auto e = std::make_unique<hic::Engine>();
     hic::makeDefaultKit(e->kit);
+    // Tests look at voices in isolation: no feel randomness, no bed, no reverb, no stutter.
     e->feel.scatterMs = 0.0f;
     e->feel.velScatter = 0.0f;
+    e->bed.type = hic::BedType::Off;
+    e->reverb.mix = 0.0f;
+    e->repeat.enabled = false;
+    e->prepare(sr);
+    return e;
+}
+
+/// The instrument as shipped: default feel, bed, reverb and stutter.
+inline std::unique_ptr<hic::Engine> makeFullEngine(float sr) {
+    auto e = std::make_unique<hic::Engine>();
+    hic::makeDefaultKit(e->kit);
     e->prepare(sr);
     return e;
 }
 
 /// Runs the engine for `frames` samples in blocks of `block`, feeding `events`
 /// (sampleTime absolute from the start of the render).
-inline Stereo renderEvents(hic::Engine& e, const std::vector<hic::NoteEvent>& events, int frames, int block = 256) {
+inline Stereo renderEvents(hic::Engine& e, const std::vector<hic::NoteEvent>& events, int frames, int block = 256, double bpm = 0.0) {
     Stereo out; out.l.assign(size_t(frames), 0.0f); out.r.assign(size_t(frames), 0.0f);
     hic::TransportInfo t;
+    if (bpm > 0.0) { t.valid = true; t.playing = true; t.bpm = bpm; }
     hic::NoteEvent in[hic::kMaxEvents];
     for (int pos = 0; pos < frames; pos += block) {
         const int n = (frames - pos) < block ? (frames - pos) : block;
+        if (bpm > 0.0) t.ppq = bpm / 60.0 * double(pos) / double(e.sampleRate());
         int nIn = 0;
         for (const auto& ev : events)
             if (ev.sampleTime >= pos && ev.sampleTime < pos + n && nIn < hic::kMaxEvents) { in[nIn] = ev; in[nIn].sampleTime -= pos; ++nIn; }

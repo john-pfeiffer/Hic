@@ -20,8 +20,8 @@ private:
 /// Attack / release envelope driven by a gate. One-pole toward 1 or 0.
 class ArEnv {
 public:
-    /// Attack reaches ~95 % of full scale after `ms`.
-    void setAttackMs(float ms, float sr)  { ca_ = smoothCoef((ms < 0.1f ? 0.1f : ms) / 3.0f, sr); }
+    /// Attack reaches ~99 % of full scale after `ms`.
+    void setAttackMs(float ms, float sr)  { ca_ = smoothCoef((ms < 0.1f ? 0.1f : ms) / 5.0f, sr); }
     /// Release reaches -60 dB after `ms` (same convention as ExpDecay).
     void setReleaseMs(float ms, float sr) { cr_ = decayCoef(ms < 0.1f ? 0.1f : ms, sr); }
     void gate(bool on) { gate_ = on; }

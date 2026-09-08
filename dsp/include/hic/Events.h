@@ -11,7 +11,12 @@ enum EventFlags : uint8_t {
     EvAccent    = 1 << 1,
     EvBedGate   = 1 << 2,   // toggles the bed gate rather than playing a pad
     EvNoPad     = 1 << 3,   // control event, no voice
+    EvNoteOff   = 1 << 4,   // release of a held control note (freeze)
 };
+
+/// MIDI control notes handled by the engine rather than the kit.
+constexpr int kNoteFreezeHold  = 90;
+constexpr int kNoteForceRepeat = 91;
 
 /// One hit. sampleTime is relative to the start of the current block when
 /// handed to Engine::process, and absolute once inside the EventQueue.
@@ -24,6 +29,7 @@ struct NoteEvent {
     uint8_t flags = 0;
     uint16_t step = 0;      // sequencer step index (for seeded randomness)
     uint32_t bar = 0;       // bar index (for seeded randomness)
+    uint32_t seed = 0;      // per-hit random seed; 0 lets the engine assign one
 };
 
 /// Host transport snapshot for one block.

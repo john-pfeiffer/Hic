@@ -87,6 +87,7 @@ TEST(decay_is_independent_of_sample_rate) {
 TEST(lookahead_delays_hits_and_lets_them_move_early) {
     auto e = makeEngine(kSr);
     e->feel.lookaheadMs = 20.0f;
+    e->feel.nudgeMs = 0.0f;
     e->prepare(kSr);
     const int frames = int(kSr * 0.2f);
     auto s = mono(renderEvents(*e, { hit(0, PadClosedHat, 0.9f) }, frames, 64));

@@ -49,11 +49,49 @@ int main(int argc, char** argv) {
             for (const S& s : beat)
                 ev.push_back(midiHit(int64_t(double(loop * 32 + s.step) * step * double(kSr)), s.note, s.vel));
         const int frames = int(64.0 * step * double(kSr)) + int(kSr);
-        auto e2 = makeEngine(kSr);
-        Stereo s = renderEvents(*e2, ev, frames);
-        writeStereo(dir + "/gm_pattern.wav", s);
-        auto m = mono(s);
-        printStats("gm_pattern.wav", m.data(), frames, kSr);
+        {
+            auto dry = makeEngine(kSr);
+            Stereo s = renderEvents(*dry, ev, frames);
+            writeStereo(dir + "/gm_pattern_dry.wav", s);
+            auto m = mono(s);
+            printStats("gm_pattern_dry.wav", m.data(), frames, kSr);
+        }
+        {
+            // The instrument as shipped: feel, crackle bed ducked to the kick, spring, rare stutter.
+            auto full = makeFullEngine(kSr);
+            full->feel.lookaheadMs = 20.0f; full->prepare(kSr);
+            full->repeat.probability = 0.5f;   // a little more eager than the default so the demo shows one
+            Stereo s = renderEvents(*full, ev, frames, 256, bpm);
+            writeStereo(dir + "/gm_pattern.wav", s);
+            auto m = mono(s);
+            printStats("gm_pattern.wav", m.data(), frames, kSr);
+            std::printf("  (stutters in gm_pattern: %d)\n", full->beatRepeat().repeatCount());
+        }
+        {
+            // Bed only: crackle and hiss, gated to eighths, ducked by a silent kick.
+            auto b = makeFullEngine(kSr);
+            b->bed.type = BedType::Both; b->bed.level = 0.5f; b->bed.gate = BedGate::Eighths; b->bed.gateDuty = 0.6f;
+            b->kit.pads[PadKick].level = 0.0f;
+            std::vector<NoteEvent> kicks;
+            for (int i = 0; i < 16; ++i) kicks.push_back(hit(int64_t(double(i * 4) * step * double(kSr)), PadKick, 1.0f));
+            const int bframes = int(kSr * 8.0f);
+            Stereo s = renderEvents(*b, kicks, bframes, 256, bpm);
+            writeStereo(dir + "/bed_crackle_ducked.wav", s);
+            auto m = mono(s);
+            printStats("bed_crackle_ducked.wav", m.data(), bframes, kSr);
+        }
+        {
+            // Freeze: two clicks, then hold the freeze for two seconds of insect ticking.
+            auto f = makeFullEngine(kSr);
+            f->bed.type = BedType::Off; f->freeze.mix = 0.8f; f->freeze.grainMs = 8.0f; f->freeze.density = 18.0f; f->freeze.sprayMs = 40.0f;
+            NoteEvent on = midiHit(int(0.6f * kSr), kNoteFreezeHold, 1.0f);
+            NoteEvent off = midiHit(int(2.8f * kSr), kNoteFreezeHold, 1.0f); off.flags = EvNoteOff;
+            const int fframes = int(kSr * 3.5f);
+            Stereo s = renderEvents(*f, { hit(int(0.2f * kSr), PadClosedHat, 0.9f), hit(int(0.4f * kSr), PadRide, 0.8f), on, off }, fframes, 256, bpm);
+            writeStereo(dir + "/fx_freeze_ticks.wav", s);
+            auto m = mono(s);
+            printStats("fx_freeze_ticks.wav", m.data(), fframes, kSr);
+        }
     }
     return 0;
 }

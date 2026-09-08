@@ -43,6 +43,11 @@ public:
             res_[i].set(hz, t60, sr_); res_[i].reset();
             gain_[i] = pt.gain * std::exp2(bright * 2.0f * std::log2(pt.ratio));
         }
+        // Keep the summed partials from peaking far above the fundamental alone.
+        float sum = 0.0f;
+        for (int i = 0; i < count_; ++i) sum += gain_[i];
+        const float norm = sum * 0.6f;
+        if (norm > 1.0f) for (int i = 0; i < count_; ++i) gain_[i] /= norm;
         active_ = true;
     }
 

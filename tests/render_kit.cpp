@@ -5,6 +5,7 @@
 #include "Render.h"
 #include "WavWriter.h"
 #include "hic/Kit.h"
+#include "hic/seq/Pattern.h"
 
 using namespace hic;
 using namespace hictest;
@@ -92,6 +93,20 @@ int main(int argc, char** argv) {
             auto m = mono(s);
             printStats("fx_freeze_ticks.wav", m.data(), fframes, kSr);
         }
+    }
+    // The internal sequencer: eight bars of the demo pattern on the internal clock.
+    {
+        auto sq = makeFullEngine(kSr);
+        makeDemoPattern(sq->patterns[0]);
+        sq->feel.lookaheadMs = 20.0f; sq->prepare(kSr);
+        sq->global.internalPlay = true; sq->global.internalBpm = 88.0;
+        sq->bed.gate = BedGate::Steps; sq->bed.level = 0.3f;
+        const int frames = int(8.0 * 4.0 * 60.0 / 88.0 * double(kSr)) + int(kSr);
+        Stereo s = renderEvents(*sq, {}, frames, 256);
+        writeStereo(dir + "/seq_demo.wav", s);
+        auto m = mono(s);
+        printStats("seq_demo.wav", m.data(), frames, kSr);
+        std::printf("  (stutters in seq_demo: %d)\n", sq->beatRepeat().repeatCount());
     }
     return 0;
 }

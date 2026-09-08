@@ -14,6 +14,7 @@ hic_add_test(test_primitives)
 hic_add_test(test_voices)
 hic_add_test(test_engine)
 hic_add_test(test_fx)
+hic_add_test(test_sequencer)
 hic_add_test(bench_cycles)
 
 add_executable(render_kit render_kit.cpp)

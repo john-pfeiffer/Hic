@@ -6,6 +6,7 @@ void Engine::prepare(float sampleRate) {
     sr_ = sampleRate < kMinSampleRate ? kMinSampleRate : sampleRate;
     voices_.prepare(sr_);
     clock_.prepare(sr_);
+    seq_.prepare(sr_);
     bed_.prepare(sr_);
     ducker_.prepare(sr_);
     reverb_.prepare(sr_);
@@ -33,23 +34,8 @@ bool Engine::queueHit(int pad, float vel, int note, int offset) {
 void Engine::process(const NoteEvent* in, int nIn, const TransportInfo& transport, float* outL, float* outR, int n) {
     lookahead_ = static_cast<int>(feel.lookaheadMs * 0.001f * sr_);
 
-    auto queueEvent = [&](NoteEvent e) {
-        if (e.source == static_cast<uint8_t>(EventSource::Midi)) {
-            if (e.note == kNoteFreezeHold || e.note == kNoteForceRepeat) e.flags |= EvNoPad;
-            e.pad = kit.noteToPad[e.note & 127];
-        }
-        e.sampleTime = blockStart_ + clamp<int64_t>(e.sampleTime, 0, n - 1) + lookahead_;
-        if (!(e.flags & (EvNoPad | EvNoteOff))) {
-            if (e.seed == 0)
-                e.seed = (e.source == static_cast<uint8_t>(EventSource::Seq))
-                           ? hashSeed(feel.seed, e.bar, static_cast<uint32_t>(e.step) | (static_cast<uint32_t>(e.pad) << 16))
-                           : hashSeed(feel.seed, e.note, ++hitCounter_);
-            Humanizer::apply(e, feel, kit.pads[e.pad < kNumPads ? e.pad : 0], sr_);
-        }
-        queue_.push(e);
-    };
-    for (int i = 0; i < nIn; ++i) queueEvent(in[i]);
-    for (int i = 0; i < nPending_; ++i) queueEvent(pending_[i]);
+    for (int i = 0; i < nIn; ++i) enqueue(in[i], n);
+    for (int i = 0; i < nPending_; ++i) enqueue(pending_[i], n);
     nPending_ = 0;
 
     int done = 0;
@@ -62,10 +48,28 @@ void Engine::process(const NoteEvent* in, int nIn, const TransportInfo& transpor
     }
 }
 
+void Engine::enqueue(NoteEvent e, int n) {
+    if (e.source == static_cast<uint8_t>(EventSource::Midi)) {
+        if (e.note == kNoteFreezeHold || e.note == kNoteForceRepeat) e.flags |= EvNoPad;
+        e.pad = kit.noteToPad[e.note & 127];
+    }
+    e.sampleTime = blockStart_ + clamp<int64_t>(e.sampleTime, 0, n - 1) + lookahead_;
+    if (!(e.flags & (EvNoPad | EvNoteOff))) {
+        if (e.seed == 0)
+            e.seed = (e.source == static_cast<uint8_t>(EventSource::Seq))
+                       ? hashSeed(feel.seed, e.bar, static_cast<uint32_t>(e.step) | (static_cast<uint32_t>(e.pad) << 16))
+                       : hashSeed(feel.seed, e.note, ++hitCounter_);
+        Humanizer::apply(e, feel, kit.pads[e.pad < kNumPads ? e.pad : 0], sr_);
+    }
+    queue_.push(e);
+}
+
 void Engine::updateBedGate(int n) {
     // Rhythmic gate from the clock; the sequencer may override via setBedGate.
     bool open = bedGateExternal_;
-    if (bed.gate != BedGate::Off && bed.gate != BedGate::Steps) {
+    if (bed.gate == BedGate::Steps) {
+        open = clock_.playing() && global.seqEnabled ? Sequencer::bedGateAt(activePattern(), clock_.ppqAt(n / 2)) : true;
+    } else if (bed.gate != BedGate::Off) {
         if (!clock_.playing()) open = true;
         else {
             const double period = bed.gate == BedGate::Sixteenths ? 0.25 : (bed.gate == BedGate::Eighths ? 0.5 : 1.0);
@@ -82,6 +86,12 @@ void Engine::processChunk(const TransportInfo& transport, float* outL, float* ou
     clock_.setInternalBpm(global.internalBpm);
     clock_.setBeatsPerBar(global.beatsPerBar);
     clock_.update(transport, n);
+
+    // Internal sequencer feeds the same queue as host MIDI.
+    if (global.seqEnabled && clock_.playing()) {
+        const int nSeq = seq_.process(activePattern(), kit, clock_, n, feel.seed, seqEvents_, kMaxEvents);
+        for (int i = 0; i < nSeq; ++i) enqueue(seqEvents_[i], n);
+    }
 
     for (int i = 0; i < n; ++i) { dryL_[i] = 0.0f; dryR_[i] = 0.0f; revSend_[i] = 0.0f; freezeTap_[i] = 0.0f; }
 

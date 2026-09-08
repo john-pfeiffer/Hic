@@ -9,6 +9,8 @@
 #include "hic/VoiceAllocator.h"
 #include "hic/Bed.h"
 #include "hic/seq/Clock.h"
+#include "hic/seq/Pattern.h"
+#include "hic/seq/Sequencer.h"
 #include "hic/fx/Ducker.h"
 #include "hic/fx/SpringReverb.h"
 #include "hic/fx/BeatRepeat.h"
@@ -17,10 +19,12 @@
 namespace hic {
 
 struct GlobalParams {
-    float outputDb      = 0.0f;
-    bool  internalPlay  = false;    // internal transport when the host gives none
-    double internalBpm  = 96.0;
-    int   beatsPerBar   = 4;
+    float  outputDb      = 0.0f;
+    bool   internalPlay  = false;   // internal transport when the host gives none
+    double internalBpm   = 96.0;
+    int    beatsPerBar   = 4;
+    bool   seqEnabled    = true;    // internal sequencer runs whenever the clock plays
+    int    activePattern = 0;       // 0..kNumPatterns-1
 };
 
 /// The whole instrument. The plugin (or a hardware main loop) owns one of
@@ -36,6 +40,7 @@ public:
     ReverbParams  reverb;
     RepeatParams  repeat;
     FreezeParams  freeze;
+    Pattern       patterns[kNumPatterns];
 
     void prepare(float sampleRate);
 
@@ -52,6 +57,9 @@ public:
     int64_t position() const { return blockStart_; }
     int     lookaheadSamples() const { return lookahead_; }
     const Clock& clock() const { return clock_; }
+    const Pattern& activePattern() const { return patterns[clamp(global.activePattern, 0, kNumPatterns - 1)]; }
+    /// Step a track is on right now (for playheads); -1 when stopped.
+    int currentStep(int track) const { return clock_.playing() ? Sequencer::stepAt(activePattern(), track, clock_.ppqStart()) : -1; }
     const BeatRepeat& beatRepeat() const { return repeat_; }
     bool    freezeHeld() const { return freeze_.held(); }
 
@@ -60,6 +68,7 @@ public:
 
 private:
     void processChunk(const TransportInfo& transport, float* outL, float* outR, int n);
+    void enqueue(NoteEvent e, int n);
     void renderVoices(int from, int to);
     void fire(const NoteEvent& e);
     void updateBedGate(int n);
@@ -75,6 +84,8 @@ private:
     int nPending_ = 0;
     VoiceAllocator voices_;
     Clock clock_;
+    Sequencer seq_;
+    NoteEvent seqEvents_[kMaxEvents];
     Bed bed_;
     Ducker ducker_;
     SpringReverb reverb_;

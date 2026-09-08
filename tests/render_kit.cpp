@@ -30,6 +30,19 @@ int main(int argc, char** argv) {
         printStats(name, m.data(), frames, kSr);
     }
 
+    // The Micro kit: every pad, and the GM beat again through it.
+    auto micro = makeEngine(kSr);
+    makeMicroKit(micro->kit);
+    for (int pad = 0; pad < kNumPads; ++pad) {
+        const int frames = int(kSr * (pad == PadGlock ? 3.0f : 1.5f));
+        const int note = pad == PadGlock ? 72 : (pad == PadThumb ? 45 : 36);
+        auto m = mono(renderEvents(*micro, { hit(0, pad, 0.9f, note) }, frames));
+        char name[64]; std::snprintf(name, sizeof name, "micro_%02d_%s.wav", pad, defaultPadName(pad));
+        for (char* c = name; *c; ++c) if (*c == ' ') *c = '_';
+        writeMono(dir + "/" + name, m);
+        printStats(name, m.data(), frames, kSr);
+    }
+
     // A two-bar GM beat at 92 BPM, twice, straight from note numbers.
     {
         const double bpm = 92.0;
@@ -67,6 +80,15 @@ int main(int argc, char** argv) {
             auto m = mono(s);
             printStats("gm_pattern.wav", m.data(), frames, kSr);
             std::printf("  (stutters in gm_pattern: %d)\n", full->beatRepeat().repeatCount());
+        }
+        {
+            auto mk = makeFullEngine(kSr);
+            makeMicroKit(mk->kit);
+            mk->feel.lookaheadMs = 20.0f; mk->prepare(kSr);
+            Stereo s = renderEvents(*mk, ev, frames, 256, bpm);
+            writeStereo(dir + "/gm_pattern_micro.wav", s);
+            auto m = mono(s);
+            printStats("gm_pattern_micro.wav", m.data(), frames, kSr);
         }
         {
             // Bed only: crackle and hiss, gated to eighths, ducked by a silent kick.

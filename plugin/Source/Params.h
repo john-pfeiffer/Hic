@@ -7,6 +7,7 @@ namespace hicplug {
 
 /// Parameter IDs. Pad parameters are "p<index>_<name>".
 namespace id {
+    inline const juce::String kit        = "kit";         // 0 Neon, 1 Micro
     inline const juce::String out        = "out";
     inline const juce::String seed       = "seed";
     inline const juce::String sync       = "sync";        // 0 host, 1 internal
@@ -57,7 +58,7 @@ namespace id {
 
     /// Per-pad parameter names (suffixes).
     enum PadParam { Type = 0, Preset, M0, M1, M2, M3, M4, M5, M6, M7, Level, Pan, Lowpass, Drive, Send, TailCut,
-                    Reverse, Choke, Poly, FreezeSrc, DuckSrc, ScatterMul, PadParamCount };
+                    Reverse, Choke, Poly, FreezeSrc, DuckSrc, ScatterMul, Morph, PadParamCount };
     const char* padSuffix(PadParam p);
     juce::String pad(int index, PadParam p);
 }
@@ -68,5 +69,6 @@ juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
 /// Human-readable preset names for the pad type combo boxes.
 juce::StringArray presetNames(hic::PadType type);
 juce::StringArray padTypeNames();
+juce::StringArray kitNames();
 
 } // namespace hicplug

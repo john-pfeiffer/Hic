@@ -35,7 +35,7 @@ public:
         std::vector<ParamPanel::Item> commonItems = {
             { id::pad(pad, id::Level), "Level" }, { id::pad(pad, id::Pan), "Pan" }, { id::pad(pad, id::Lowpass), "Lowpass" },
             { id::pad(pad, id::Drive), "Drive" }, { id::pad(pad, id::Send), "Reverb" }, { id::pad(pad, id::TailCut), "Tail Cut" },
-            { id::pad(pad, id::ScatterMul), "Scatter" }, { id::pad(pad, id::Choke), "Choke" }, { id::pad(pad, id::Poly), "Poly" },
+            { id::pad(pad, id::Morph), "Morph" }, { id::pad(pad, id::ScatterMul), "Scatter" }, { id::pad(pad, id::Choke), "Choke" }, { id::pad(pad, id::Poly), "Poly" },
             { id::pad(pad, id::Reverse), "Reverse" }, { id::pad(pad, id::FreezeSrc), "Freeze Src" }, { id::pad(pad, id::DuckSrc), "Duck Src" },
         };
         common.rebuild(commonItems);
@@ -68,7 +68,7 @@ private:
     }
 
     void refreshForType() {
-        const auto type = static_cast<hic::PadType>(juce::jlimit(0, 3, static_cast<int>(state.getRawParameterValue(id::pad(pad, id::Type))->load() + 0.5f)));
+        const auto type = static_cast<hic::PadType>(juce::jlimit(0, static_cast<int>(hic::PadType::Count) - 1, static_cast<int>(state.getRawParameterValue(id::pad(pad, id::Type))->load() + 0.5f)));
         std::vector<ParamPanel::Item> items;
         for (int m = 0; m < hic::kNumMacros; ++m) items.push_back({ id::pad(pad, static_cast<id::PadParam>(id::M0 + m)), hic::macroName(type, m) });
         macros.rebuild(items);

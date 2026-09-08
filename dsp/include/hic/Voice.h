@@ -8,6 +8,8 @@
 #include "hic/voices/ClickVoice.h"
 #include "hic/voices/ModalVoice.h"
 #include "hic/voices/NoiseVoice.h"
+#include "hic/voices/PingVoice.h"
+#include "hic/Rng.h"
 
 namespace hic {
 
@@ -20,12 +22,18 @@ public:
 
     void prepare(float sr) {
         sr_ = sr;
-        kick_.prepare(sr); click_.prepare(sr); modal_.prepare(sr); noise_.prepare(sr);
+        kick_.prepare(sr); click_.prepare(sr); modal_.prepare(sr); noise_.prepare(sr); ping_.prepare(sr);
         sat_.prepare(sr);
         active_ = false;
     }
 
-    void trigger(const PadParams& p, int padIndex, float vel, int note, uint32_t seed, bool reverse) {
+    void trigger(const PadParams& pIn, int padIndex, float vel, int note, uint32_t seed, bool reverse) {
+        // Morph: every hit drifts the macros a little, deterministically from its seed.
+        PadParams p = pIn;
+        if (p.morph > 0.001f) {
+            Rng r(hashSeed(seed, 0x4d4f5250u));
+            for (float& m : p.macro) m = clamp(m + p.morph * 0.3f * r.gauss3(), 0.0f, 1.0f);
+        }
         pad_ = padIndex; note_ = note; type_ = p.type;
         reverbSend_ = p.reverbSend;
         freezeSource_ = (p.flags & PadFreezeSource) != 0;
@@ -49,6 +57,7 @@ public:
             case PadType::Click: click_.trigger(p, vel, note, seed); break;
             case PadType::Modal: modal_.trigger(p, vel, note, seed); break;
             case PadType::Noise: noise_.trigger(p, vel, note, seed); break;
+            case PadType::Ping:  ping_.trigger(p, vel, note, seed);  break;
             default: break;
         }
 
@@ -121,6 +130,7 @@ private:
             case PadType::Click: click_.render(out, n); break;
             case PadType::Modal: modal_.render(out, n); break;
             case PadType::Noise: noise_.render(out, n); break;
+            case PadType::Ping:  ping_.render(out, n);  break;
             default: for (int i = 0; i < n; ++i) out[i] = 0.0f; break;
         }
     }
@@ -130,6 +140,7 @@ private:
             case PadType::Click: return click_.isActive();
             case PadType::Modal: return modal_.isActive();
             case PadType::Noise: return noise_.isActive();
+            case PadType::Ping:  return ping_.isActive();
             default: return false;
         }
     }
@@ -153,6 +164,7 @@ private:
     ClickVoice click_;
     ModalVoice modal_;
     NoiseVoice noise_;
+    PingVoice ping_;
     TptSvf lp_;
     Saturator sat_;
 };

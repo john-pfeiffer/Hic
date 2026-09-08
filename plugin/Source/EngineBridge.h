@@ -13,7 +13,7 @@ namespace hicplug {
 class EngineBridge {
 public:
     explicit EngineBridge(juce::AudioProcessorValueTreeState& s) : state(s) {
-        cache(id::out, out); cache(id::seed, seed); cache(id::sync, sync); cache(id::play, play); cache(id::bpm, bpm);
+        cache(id::kit, kitSel); cache(id::out, out); cache(id::seed, seed); cache(id::sync, sync); cache(id::play, play); cache(id::bpm, bpm);
         cache(id::lookahead, lookahead); cache(id::pattern, pattern); cache(id::seqEnable, seqEnable); cache(id::swing, swing);
         cache(id::nudge, nudge); cache(id::scatter, scatter); cache(id::velScatter, velScatter);
         for (int i = 0; i < hic::kNumPads; ++i)
@@ -28,6 +28,7 @@ public:
         cache(id::frzJitter, frzJitter); cache(id::frzMix, frzMix);
         cache(id::revType, revType); cache(id::revDecay, revDecay); cache(id::revDamp, revDamp); cache(id::revPre, revPre); cache(id::revMix, revMix);
 
+        hic::makeKit(hic::KitNeon, kits[0]); hic::makeKit(hic::KitMicro, kits[1]);
         for (auto& p : editPatterns) hic::clearPattern(p);
         hic::makeDemoPattern(editPatterns[0]);
         publishPatterns();
@@ -43,6 +44,29 @@ public:
         std::memcpy(shared[slot], editPatterns, sizeof(editPatterns));
         activeSlot.store(slot);
         version.fetch_add(1);
+    }
+
+    /// Writes a factory kit into the pad parameters (message thread).
+    void loadKit(int kitIndex) {
+        kitIndex = juce::jlimit(0, hic::KitCount - 1, kitIndex);
+        const hic::KitParams& k = kits[kitIndex];
+        auto set = [&](const juce::String& pid, float v) {
+            if (auto* p = state.getParameter(pid)) p->setValueNotifyingHost(p->convertTo0to1(v));
+        };
+        set(id::kit, static_cast<float>(kitIndex));
+        for (int i = 0; i < hic::kNumPads; ++i) {
+            const hic::PadParams& p = k.pads[i];
+            set(id::pad(i, id::Type), static_cast<float>(p.type));
+            set(id::pad(i, id::Preset), p.preset);
+            for (int m = 0; m < hic::kNumMacros; ++m) set(id::pad(i, static_cast<id::PadParam>(id::M0 + m)), p.macro[m]);
+            set(id::pad(i, id::Level), p.level); set(id::pad(i, id::Pan), p.pan); set(id::pad(i, id::Lowpass), p.lowpassHz);
+            set(id::pad(i, id::Drive), p.driveDb); set(id::pad(i, id::Send), p.reverbSend); set(id::pad(i, id::TailCut), p.tailCutMs);
+            set(id::pad(i, id::Reverse), (p.flags & hic::PadReverse) ? 1.0f : 0.0f);
+            set(id::pad(i, id::Choke), p.chokeGroup); set(id::pad(i, id::Poly), p.maxPoly);
+            set(id::pad(i, id::FreezeSrc), (p.flags & hic::PadFreezeSource) ? 1.0f : 0.0f);
+            set(id::pad(i, id::DuckSrc), (p.flags & hic::PadDuckSource) ? 1.0f : 0.0f);
+            set(id::pad(i, id::ScatterMul), p.scatterMul); set(id::pad(i, id::Morph), p.morph);
+        }
     }
 
     void loadPatterns(const void* data, size_t bytes) {
@@ -62,10 +86,19 @@ public:
         e.feel.scatterMs = *scatter;
         e.feel.velScatter = *velScatter;
 
+        // Note tracking, base notes and the note map come from the selected factory kit;
+        // everything else is a parameter.
+        const hic::KitParams& base = kits[juce::jlimit(0, hic::KitCount - 1, static_cast<int>(*kitSel + 0.5f))];
+        std::memcpy(e.kit.noteToPad, base.noteToPad, sizeof(e.kit.noteToPad));
+        e.kit.seed = base.seed;
         for (int i = 0; i < hic::kNumPads; ++i) {
             hic::PadParams& p = e.kit.pads[i];
             const auto& r = padRaw[i];
-            p.type = static_cast<hic::PadType>(juce::jlimit(0, 3, static_cast<int>(*r[id::Type] + 0.5f)));
+            p.baseNote = base.pads[i].baseNote;
+            p.reverseMs = base.pads[i].reverseMs;
+            p.velToLevel = base.pads[i].velToLevel;
+            p.velToTone = base.pads[i].velToTone;
+            p.type = static_cast<hic::PadType>(juce::jlimit(0, static_cast<int>(hic::PadType::Count) - 1, static_cast<int>(*r[id::Type] + 0.5f)));
             p.preset = static_cast<uint8_t>(juce::jlimit(0, hic::padPresetCount(p.type) - 1, static_cast<int>(*r[id::Preset] + 0.5f)));
             for (int m = 0; m < hic::kNumMacros; ++m) p.macro[m] = *r[id::M0 + m];
             p.level = *r[id::Level]; p.pan = *r[id::Pan]; p.lowpassHz = *r[id::Lowpass]; p.driveDb = *r[id::Drive];
@@ -73,7 +106,8 @@ public:
             p.chokeGroup = static_cast<uint8_t>(*r[id::Choke] + 0.5f);
             p.maxPoly = static_cast<uint8_t>(juce::jlimit(1.0f, 8.0f, *r[id::Poly] + 0.5f));
             p.scatterMul = *r[id::ScatterMul];
-            uint8_t flags = p.flags & hic::PadFollowsNote;   // note tracking comes from the kit definition
+            p.morph = *r[id::Morph];
+            uint8_t flags = base.pads[i].flags & hic::PadFollowsNote;
             if (*r[id::Reverse] > 0.5f) flags |= hic::PadReverse;
             if (*r[id::FreezeSrc] > 0.5f) flags |= hic::PadFreezeSource;
             if (*r[id::DuckSrc] > 0.5f) flags |= hic::PadDuckSource;
@@ -103,6 +137,8 @@ public:
         e.reverb.decaySec = *revDecay; e.reverb.dampHz = *revDamp; e.reverb.predelayMs = *revPre; e.reverb.mix = *revMix;
 
         // Patterns: copy when a new version was published; retry if it changed mid-copy.
+        // The exporter uses its own Engine, so the applied version is tracked per engine.
+        if (&e != appliedEngine) { appliedEngine = &e; appliedVersion = -1; }
         for (int attempt = 0; attempt < 4; ++attempt) {
             const int v = version.load();
             if (v == appliedVersion) break;
@@ -117,7 +153,7 @@ private:
     void cache(const juce::String& idStr, std::atomic<float>*& dst) { dst = state.getRawParameterValue(idStr); jassert(dst != nullptr); }
 
     juce::AudioProcessorValueTreeState& state;
-    std::atomic<float> *out, *seed, *sync, *play, *bpm, *lookahead, *pattern, *seqEnable, *swing, *nudge, *scatter, *velScatter;
+    std::atomic<float> *kitSel, *out, *seed, *sync, *play, *bpm, *lookahead, *pattern, *seqEnable, *swing, *nudge, *scatter, *velScatter;
     std::atomic<float>* padRaw[hic::kNumPads][id::PadParamCount];
     std::atomic<float> *bedType, *bedLevel, *bedDensity, *bedWarmth, *bedPop, *bedColor, *bedHiss, *bedGate, *bedGateAtt, *bedGateRel, *bedGateDuty;
     std::atomic<float> *duckDepth, *duckHold, *duckRel;
@@ -125,11 +161,13 @@ private:
     std::atomic<float> *frzHold, *frzGrain, *frzDensity, *frzSpray, *frzJitter, *frzMix;
     std::atomic<float> *revType, *revDecay, *revDamp, *revPre, *revMix;
 
+    hic::KitParams kits[hic::KitCount];
     hic::Pattern editPatterns[hic::kNumPatterns];
     hic::Pattern shared[2][hic::kNumPatterns];
     std::atomic<int> activeSlot { 0 };
     std::atomic<int> version { 0 };
     int appliedVersion = -1;
+    const hic::Engine* appliedEngine = nullptr;
 };
 
 } // namespace hicplug

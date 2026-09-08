@@ -37,6 +37,7 @@ int padPresetCount(PadType t) {
         case PadType::Click: return ClickPresetCount;
         case PadType::Modal: return ModalPresetCount;
         case PadType::Noise: return NoisePresetCount;
+        case PadType::Ping:  return PingPresetCount;
         default: return 1;
     }
 }
@@ -45,12 +46,14 @@ const char* padPresetName(PadType t, int preset) {
     static const char* const kick[KickPresetCount]   = { "Snap", "Blanket", "Plain" };
     static const char* const click[ClickPresetCount] = { "Impulse", "Dipole", "Burst", "CD Skip" };
     static const char* const noise[NoisePresetCount] = { "Hat", "Brush", "Shaker", "Paper" };
+    static const char* const ping[PingPresetCount]   = { "Sine", "Bright", "Ring", "Feedback" };
     if (preset < 0 || preset >= padPresetCount(t)) return "";
     switch (t) {
         case PadType::Kick:  return kick[preset];
         case PadType::Click: return click[preset];
         case PadType::Modal: return modalPreset(preset).name;
         case PadType::Noise: return noise[preset];
+        case PadType::Ping:  return ping[preset];
         default: return "";
     }
 }

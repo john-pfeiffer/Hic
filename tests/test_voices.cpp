@@ -112,3 +112,58 @@ TEST(modal_presets_all_render) {
         CHECK_MSG(peak(s.data(), frames) > 0.02f && peak(s.data(), frames) <= 1.0f, "modal preset %s peak %.3f", modalPreset(ps).name, double(peak(s.data(), frames)));
     }
 }
+
+TEST(ping_presets_render_and_bend) {
+    auto e = makeEngine(kSr);
+    const int frames = int(kSr);
+    PadParams& p = e->kit.pads[PadWoodblock];
+    p.type = PadType::Ping; p.lowpassHz = 20000.0f; p.flags = 0;
+    for (int ps = 0; ps < PingPresetCount; ++ps) {
+        p.preset = uint8_t(ps);
+        for (int m = 0; m < kNumMacros; ++m) p.macro[m] = 0.5f;
+        p.macro[5] = 0.7f; p.macro[7] = 0.3f;
+        auto s = mono(renderEvents(*e, { hit(0, PadWoodblock, 0.9f) }, frames));
+        CHECK_MSG(!hasNaN(s.data(), frames), "ping preset %d NaN", ps);
+        CHECK_MSG(peak(s.data(), frames) > 0.05f && peak(s.data(), frames) <= 1.0f, "ping preset %d peak %.3f", ps, double(peak(s.data(), frames)));
+        CHECK_MSG(decayMs(s.data(), frames, kSr) < 400.0f, "ping preset %d decay %.0f", ps, double(decayMs(s.data(), frames, kSr)));
+    }
+    // A downward bend: more zero crossings in the first 10 ms than in a later 10 ms window.
+    p.preset = PingSine; p.macro[2] = 0.85f; p.macro[3] = 0.6f; p.macro[5] = 0.0f; p.macro[7] = 0.0f; p.macro[1] = 0.6f;
+    auto z = mono(renderEvents(*e, { hit(0, PadWoodblock, 0.9f) }, frames));
+    auto crossings = [&](int from, int len) { int c = 0; for (int i = from + 1; i < from + len; ++i) if ((z[size_t(i)] >= 0) != (z[size_t(i - 1)] >= 0)) ++c; return c; };
+    CHECK_MSG(crossings(0, 480) > crossings(4800, 480) * 2, "bend: early %d late %d crossings", crossings(0, 480), crossings(4800, 480));
+}
+
+TEST(morph_varies_hits_deterministically) {
+    auto e = makeEngine(kSr);
+    e->kit.pads[PadWoodblock].morph = 0.5f;
+    const int frames = int(kSr * 0.5f);
+    auto a = mono(renderEvents(*e, { hit(0, PadWoodblock, 0.9f) }, frames));
+    auto b = mono(renderEvents(*e, { hit(0, PadWoodblock, 0.9f) }, frames));   // second hit: new seed via hit counter
+    bool differs = false;
+    for (int i = 0; i < frames; ++i) if (std::fabs(a[size_t(i)] - b[size_t(i)]) > 1e-6f) { differs = true; break; }
+    CHECK(differs);
+    auto e2 = makeEngine(kSr);
+    e2->kit.pads[PadWoodblock].morph = 0.5f;
+    auto c = mono(renderEvents(*e2, { hit(0, PadWoodblock, 0.9f) }, frames));
+    bool same = true;
+    for (int i = 0; i < frames; ++i) if (a[size_t(i)] != c[size_t(i)]) { same = false; break; }
+    CHECK(same);
+}
+
+TEST(micro_kit_is_clean) {
+    auto e = makeEngine(kSr);
+    makeMicroKit(e->kit);
+    e->kit.pads[PadGlock].level = e->kit.pads[PadGlock].level;   // keep
+    const int frames = int(kSr * 3.0f);
+    for (int pad = 0; pad < kNumPads; ++pad) {
+        const int note = pad == PadGlock ? 72 : (pad == PadThumb ? 45 : 36);
+        for (float vel : { 0.4f, 1.0f }) {
+            auto s = mono(renderEvents(*e, { hit(0, pad, vel, note) }, frames));
+            const float pk = peak(s.data(), frames);
+            CHECK_MSG(!hasNaN(s.data(), frames), "micro pad %d NaN", pad);
+            CHECK_MSG(pk > 0.01f && pk <= dbToGain(-0.5f), "micro pad %d (%s) peak %.2f dBFS", pad, defaultPadName(pad), double(gainToDb(pk)));
+            CHECK_MSG(decayMs(s.data(), frames, kSr) < 2500.0f, "micro pad %d decay %.0f ms", pad, double(decayMs(s.data(), frames, kSr)));
+        }
+    }
+}

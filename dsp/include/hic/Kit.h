@@ -15,6 +15,15 @@ struct KitParams {
 /// plays. Unmapped notes fall to the nearest mapped note.
 void makeDefaultKit(KitParams& kit);
 
+/// "Micro": synthetic, morphing micro-percussion on the same GM map. Blips,
+/// zaps, detuned pings, crunchy noise, in the spirit of modular and FM
+/// percussion sample packs.
+void makeMicroKit(KitParams& kit);
+
+enum KitId : uint8_t { KitNeon = 0, KitMicro, KitCount };
+void makeKit(KitId id, KitParams& kit);
+const char* kitName(KitId id);
+
 /// Fills noteToPad from explicit (note, pad) pairs, nearest-note fallback.
 void buildNoteMap(KitParams& kit, const uint8_t* notes, const uint8_t* pads, int count);
 

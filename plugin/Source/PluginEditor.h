@@ -19,8 +19,14 @@ private:
     void parameterChanged(const juce::String& id, float value) override;
     void showPattern();
 
+    void loadKitMenu();
+    void exportKit();
+    void exportLoop();
+
     HicProcessor& proc;
     juce::Label title;
+    juce::TextButton kitButton { "Kit" }, exportButton { "Export kit" }, loopButton { "Bounce loop" };
+    std::unique_ptr<juce::FileChooser> chooser;
     hicplug::ParamPanel transport, feel, bedPanel, duckPanel, repeatPanel, freezePanel, reverbPanel;
     hicplug::PadStrip pads;
     hicplug::PadEditor padEditor;

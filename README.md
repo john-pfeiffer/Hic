@@ -8,6 +8,36 @@ kick, and a stutter only every few bars.
 Reference points: Lali Puna, The Notwist (*Neon Golden*), Ms. John Soda,
 Múm (*Finally We Are No One*), Arovane, Isan, Dntel, early Four Tet.
 
+## What it does
+
+- **Twelve pads, five synthesis engines.** Kick (filtered sine with a snap
+  or blanket attack), Click (impulses, dipoles, reduced-bit bursts,
+  CD-skip trains), Modal (a struck-object model with cross-stick, rimshot,
+  woodblock, pencil tap, muted guitar, glockenspiel, toy piano, bell and
+  bowl presets), Noise (hats, brushes, shakers, paper) and Ping (FM,
+  ring-modulated and pitch-bent synthetic micro-percussion).
+- **Two factory kits on the General MIDI map**, so any existing drum
+  pattern plays: *Neon* (the Notwist / Lali Puna palette) and *Micro*
+  (morphing synthetic micro-percussion in the spirit of modular and FM
+  percussion sample packs).
+- **Feel.** Every hit can be nudged a few milliseconds and scattered in
+  time and velocity, deterministically from a seed, so a loop sounds the
+  same each time until you change the seed. A per-pad *morph* control
+  drifts the macros a little on every hit.
+- **A bed** of vinyl crackle and tape hiss that can run free, gate to the
+  clock or to step flags, and duck under the kick.
+- **Restrained glitch.** A beat repeat that fires at a low, seeded
+  probability with a minimum number of bars between stutters; a granular
+  freeze that grabs the last click and turns it into ticking insects
+  (MIDI note 90 holds it, 91 forces a stutter); a short spring or room
+  reverb with no hall setting.
+- **A step sequencer** with polymetric track lengths, per-step velocity,
+  nudge, probability, ratchet, accent, reverse (the hit swells into its
+  step) and bed-gate flags, synced to the host or an internal clock.
+- **Sample export.** *Export kit* bounces every pad as a set of one-shots
+  at several seeds and velocities; *Bounce loop* renders the active
+  pattern. Build your own packs from the instrument.
+
 ## Shape of the project
 
 - `dsp/` is a dependency-free C++17 synthesis core: no JUCE types, no heap
@@ -28,7 +58,12 @@ ctest --test-dir build --output-on-failure
 build/tests/render_kit out/    # renders every pad and the demo beats to WAV
 ```
 
-Or simply `scripts/verify.sh`.
+Or simply `scripts/verify.sh`. The render tool writes both kits pad by pad,
+a GM demo beat through each, the bed on its own, a freeze demo and the
+internal sequencer's demo pattern.
+
+Hardware is not built yet, but the core is written to port to a Daisy Seed
+class microcontroller; see `docs/PORTING_DAISY.md`.
 
 ## Building the plugin
 

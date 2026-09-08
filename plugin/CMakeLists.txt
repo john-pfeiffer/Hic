@@ -30,7 +30,7 @@ target_compile_definitions(Hic PUBLIC
   JUCE_REPORT_APP_USAGE=0)
 
 target_link_libraries(Hic
-  PRIVATE hic_dsp juce::juce_audio_utils
+  PRIVATE hic_dsp juce::juce_audio_utils juce::juce_audio_formats
   PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags)
 
 # The core keeps a `default:` in every switch and compares floats on purpose.

@@ -10,14 +10,15 @@ namespace hicplug {
 const char* id::padSuffix(PadParam p) {
     static const char* const names[PadParamCount] = {
         "type", "preset", "m0", "m1", "m2", "m3", "m4", "m5", "m6", "m7", "level", "pan", "lowpass", "drive",
-        "send", "tailcut", "reverse", "choke", "poly", "freeze_src", "duck_src", "scatter_mul"
+        "send", "tailcut", "reverse", "choke", "poly", "freeze_src", "duck_src", "scatter_mul", "morph"
     };
     return names[p];
 }
 
 String id::pad(int index, PadParam p) { return "p" + String(index) + "_" + padSuffix(p); }
 
-StringArray padTypeNames() { return { "Kick", "Click", "Modal", "Noise" }; }
+StringArray padTypeNames() { return { "Kick", "Click", "Modal", "Noise", "Ping" }; }
+StringArray kitNames() { return { "Neon", "Micro" }; }
 
 StringArray presetNames(hic::PadType type) {
     StringArray out;
@@ -40,6 +41,7 @@ AudioProcessorValueTreeState::ParameterLayout createLayout() {
     hic::KitParams kit; hic::makeDefaultKit(kit);
 
     // Global and feel
+    layout.add(std::make_unique<AudioParameterChoice>(ParameterID{ id::kit, 1 }, "Kit", kitNames(), 0));
     layout.add(lin(id::out, "Output", -60.0f, 12.0f, 0.0f, "dB"));
     layout.add(std::make_unique<AudioParameterInt>(ParameterID{ id::seed, 1 }, "Seed", 1, 999, 1));
     layout.add(std::make_unique<AudioParameterChoice>(ParameterID{ id::sync, 1 }, "Sync", StringArray{ "Host", "Internal" }, 0));
@@ -73,6 +75,7 @@ AudioProcessorValueTreeState::ParameterLayout createLayout() {
         layout.add(std::make_unique<AudioParameterBool>(ParameterID{ id::pad(i, id::FreezeSrc), 1 }, base + "Freeze Source", (p.flags & hic::PadFreezeSource) != 0));
         layout.add(std::make_unique<AudioParameterBool>(ParameterID{ id::pad(i, id::DuckSrc), 1 }, base + "Duck Source", (p.flags & hic::PadDuckSource) != 0));
         layout.add(lin(id::pad(i, id::ScatterMul), base + "Scatter Amount", 0.0f, 3.0f, p.scatterMul));
+        layout.add(lin(id::pad(i, id::Morph), base + "Morph", 0.0f, 1.0f, p.morph));
     }
 
     // Bed and ducker

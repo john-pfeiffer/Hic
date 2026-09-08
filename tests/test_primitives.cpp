@@ -152,10 +152,12 @@ TEST(saturator_is_bounded_and_blocks_dc) {
 TEST(alloc_guard_catches_heap_use) {
     const int64_t before = hictest::allocViolations();
     {
+        // A direct call to ::operator new cannot be elided by the compiler
+        // (a new-expression or a libc++ builtin allocation can be).
         hictest::allocForbidden() = true;
-        std::vector<int> v(64);
-        v[0] = 1;
-        CHECK(v[0] == 1);
+        void* p = ::operator new(64);
+        CHECK(p != nullptr);
+        ::operator delete(p);
         hictest::allocForbidden() = false;
     }
     CHECK(hictest::allocViolations() == before + 1);

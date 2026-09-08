@@ -38,16 +38,17 @@ static double referenceNsPerTick(int frames) {
     Rng r(1);
     std::vector<float> in((size_t)frames);
     for (auto& x : in) x = r.bipolar();
+    static volatile float sink = 0.0f;   // the optimiser must not be allowed to drop the loop
     double best = 1e9;
     for (int rep = 0; rep < 5; ++rep) {
         Timer t;
         float acc = 0.0f;
         for (int i = 0; i < frames; ++i) acc += f.lp(in[(size_t)i]);
+        sink = sink + acc;
         const double ns = t.seconds() * 1e9 / frames;
-        if (acc == 12345.0f) std::printf("");   // keep the loop alive
         if (ns < best) best = ns;
     }
-    return best;
+    return best < 0.5 ? 0.5 : best;   // a tick under half a nanosecond means the loop was elided
 }
 
 TEST(bench_voice_and_engine) {

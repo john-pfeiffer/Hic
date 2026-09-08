@@ -56,5 +56,15 @@ jobs:
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DHIC_BUILD_PLUGIN=ON -DHIC_BUILD_TESTS=OFF
       - name: Build
         run: cmake --build build
-      - name: Locate artefacts
-        run: find build -name "*.vst3" -o -name "*.component" -o -name "Hic" -type f | head
+      - name: Collect plugin bundles
+        run: |
+          mkdir -p dist
+          cp -R build/plugin/Hic_artefacts/Release/VST3 dist/ 2>/dev/null || true
+          cp -R build/plugin/Hic_artefacts/Release/AU dist/ 2>/dev/null || true
+          cp -R build/plugin/Hic_artefacts/Release/Standalone dist/ 2>/dev/null || true
+          ls -R dist | head -40
+      - uses: actions/upload-artifact@v5
+        with:
+          name: Hic-plugin-${{ matrix.os }}
+          path: dist
+          if-no-files-found: error

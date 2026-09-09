@@ -52,8 +52,12 @@ jobs:
       - name: Dependencies (macOS)
         if: runner.os == 'macOS'
         run: brew install ninja
-      - name: Configure
+      - name: Configure (Linux)
+        if: runner.os == 'Linux'
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DHIC_BUILD_PLUGIN=ON -DHIC_BUILD_TESTS=OFF
+      - name: Configure (macOS, universal)
+        if: runner.os == 'macOS'
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DHIC_BUILD_PLUGIN=ON -DHIC_BUILD_TESTS=OFF -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
       - name: Build
         run: cmake --build build
       - name: Collect plugin bundles
